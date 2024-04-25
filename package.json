@@ -1,0 +1,11 @@
+{
+  "name": "topo-tool",
+  "version": "0.0.1",
+  "description": "topogrpahic line drawing tool",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "dtweed",
+  "license": "ISC"
+}
