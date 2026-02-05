@@ -4,8 +4,16 @@
   "description": "topogrpahic line drawing tool",
   "main": "index.js",
   "scripts": {
-    "test": "test"
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "visual": "npm run build && node topo-render/test/visual/create-image.js",
+    "test": "npm run visual"
   },
   "author": "dtweed",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "http-server": "^14.1.1",
+    "typescript": "^5.7.0"
+  }
 }

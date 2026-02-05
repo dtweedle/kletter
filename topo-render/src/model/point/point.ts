@@ -14,18 +14,34 @@ export class Point<PointT extends PointType> {
      */
     constructor(public x: number, public y: number, public type: PointT) {}
 
+    /**
+     * Render this point as an SVG element string.
+     *
+     * For now we render each point as a small circle, with the fill colour
+     * indicating the point type. The coordinates are assumed to already be
+     * in the SVG canvas coordinate space.
+     */
     public render(): string {
-        switch( this.type ) {
-            case PointType.GENERIC:
-                return ""
+        const radius = 4;
+
+        let fill = "#ffffff";
+        const stroke = "#000000";
+
+        switch (this.type) {
             case PointType.ANCHOR:
-                return "<circle></circle>";
+                fill = "#ffd54f";
+                break;
             case PointType.BOLT:
-                return  ""
+                fill = "#42a5f5";
+                break;
             case PointType.FEATURE:
-                return "<circle></circle>";
+                fill = "#66bb6a";
+                break;
+            case PointType.GENERIC:
             default:
-                throw new Error("Unknown point type");
+                fill = "#ffffff";
         }
+
+        return `<circle cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${stroke}" data-point-type="${this.type}" />`;
     }
 }
