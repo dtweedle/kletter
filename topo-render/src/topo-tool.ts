@@ -1,4 +1,5 @@
 import { Point, PointType } from "./model/point";
+import { Segment } from "./model/segment";
 
 export interface TopoRenderOptions {
     /**
@@ -14,6 +15,18 @@ export interface TopoRenderOptions {
      * Defaults to 200.
      */
     height?: number;
+
+    /**
+     * Intensity of the curve for route segments.
+     *
+     * This is a scalar applied to the Catmull–Rom based control point
+     * calculation when converting to cubic Bézier segments:
+     *
+     *   - 0   → straight lines between points
+     *   - 1   → default smoothing
+     *   - > 1 → increasingly exaggerated curves
+     */
+    curveIntensity?: number;
 }
 
 /**
@@ -23,10 +36,12 @@ export class TopoRender {
     private image?: string;
     private width: number;
     private height: number;
+    private curveIntensity: number;
 
     constructor(options: TopoRenderOptions = {}) {
         this.width = options.width ?? 200;
         this.height = options.height ?? 200;
+        this.curveIntensity = options.curveIntensity ?? 1;
     }
 
     /**
@@ -44,7 +59,11 @@ export class TopoRender {
      * - Otherwise, we render a solid black background.
      * - Any points passed in are rendered on top of the background.
      */
-    public render(points: Array<Point<PointType>> = [], imageHref?: string): string {
+    public render(
+        points: Array<Point<PointType>> = [],
+        segments: Segment[] = [],
+        imageHref?: string
+    ): string {
         const width = this.width;
         const height = this.height;
         const effectiveImageHref = imageHref ?? this.image;
@@ -68,6 +87,10 @@ export class TopoRender {
 
         for (const p of points) {
             svgParts.push(p.render());
+        }
+
+        for (const segment of segments) {
+            svgParts.push(segment.render(this.curveIntensity));
         }
 
         svgParts.push(`</svg>`);

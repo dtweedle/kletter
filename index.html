@@ -1,1 +1,98 @@
-<svg width="200" height="200" style="background-color:black">
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Topo Render Visual Test</title>
+    <style>
+      body {
+        background: #111;
+        color: #eee;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 16px;
+      }
+      h1, h2 {
+        font-weight: 500;
+      }
+      .case {
+        margin-bottom: 32px;
+      }
+      svg {
+        border: 1px solid #444;
+        background: #000;
+        display: block;
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .variant {
+        flex: 1 1 0;
+        min-width: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Topo Render Visual Test</h1>
+
+    <div class="case">
+      <h2>Case 1: Points only</h2>
+      <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="40" cy="160" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="80" cy="140" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="120" cy="110" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="150" cy="80" r="4" fill="#ffd54f" stroke="#000000" data-point-type="anchor" /><circle cx="60" cy="60" r="4" fill="#ffffff" stroke="#000000" data-point-type="generic" /></svg>
+    </div>
+
+    <div class="case">
+      <h2>Case 2: Straight segments</h2>
+      <div class="row">
+        <div class="variant">
+          <h3>Curve intensity: 0 (straight)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="20" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="60" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="140" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="180" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="20" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="60" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="140" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><path d="M 20 180 C 20 180 60 180 60 180 C 60 180 100 180 100 180 C 100 180 140 180 140 180 C 140 180 180 180 180 180" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M 20 20 C 20 20 20 60 20 60 C 20 60 20 100 20 100 C 20 100 20 140 20 140 C 20 140 20 180 20 180" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="variant">
+          <h3>Curve intensity: 1 (default)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="20" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="60" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="140" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="180" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="20" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="60" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="140" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><path d="M 20 180 C 26.666666666666664 180 46.66666666666667 180 60 180 C 73.33333333333333 180 86.66666666666667 180 100 180 C 113.33333333333333 180 126.66666666666667 180 140 180 C 153.33333333333334 180 173.33333333333334 180 180 180" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M 20 20 C 20 26.666666666666664 20 46.66666666666667 20 60 C 20 73.33333333333333 20 86.66666666666667 20 100 C 20 113.33333333333333 20 126.66666666666667 20 140 C 20 153.33333333333334 20 173.33333333333334 20 180" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="variant">
+          <h3>Curve intensity: 2 (strong)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="20" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="60" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="140" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="180" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="20" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="60" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="140" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="20" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><path d="M 20 180 C 33.33333333333333 180 33.333333333333336 180 60 180 C 86.66666666666666 180 73.33333333333334 180 100 180 C 126.66666666666666 180 113.33333333333334 180 140 180 C 166.66666666666666 180 166.66666666666666 180 180 180" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><path d="M 20 20 C 20 33.33333333333333 20 33.333333333333336 20 60 C 20 86.66666666666666 20 73.33333333333334 20 100 C 20 126.66666666666666 20 113.33333333333334 20 140 C 20 166.66666666666666 20 166.66666666666666 20 180" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="case">
+      <h2>Case 3: Zig-zag route</h2>
+      <div class="row">
+        <div class="variant">
+          <h3>Curve intensity: 0 (straight)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="40" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="80" cy="140" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="120" cy="160" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="140" cy="120" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="80" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="140" cy="40" r="4" fill="#ffd54f" stroke="#000000" data-point-type="anchor" /><path d="M 40 180 C 40 180 80 140 80 140 C 80 140 120 160 120 160 C 120 160 140 120 140 120 C 140 120 100 80 100 80 C 100 80 140 40 140 40" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="variant">
+          <h3>Curve intensity: 1 (default)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="40" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="80" cy="140" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="120" cy="160" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="140" cy="120" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="80" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="140" cy="40" r="4" fill="#ffd54f" stroke="#000000" data-point-type="anchor" /><path d="M 40 180 C 46.666666666666664 173.33333333333334 66.66666666666667 143.33333333333334 80 140 C 93.33333333333333 136.66666666666666 110 163.33333333333334 120 160 C 130 156.66666666666666 143.33333333333334 133.33333333333334 140 120 C 136.66666666666666 106.66666666666667 100 93.33333333333333 100 80 C 100 66.66666666666667 133.33333333333334 46.666666666666664 140 40" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="variant">
+          <h3>Curve intensity: 2 (strong)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="40" cy="180" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="80" cy="140" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="120" cy="160" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="140" cy="120" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="80" r="4" fill="#66bb6a" stroke="#000000" data-point-type="natural_protection" /><circle cx="140" cy="40" r="4" fill="#ffd54f" stroke="#000000" data-point-type="anchor" /><path d="M 40 180 C 53.33333333333333 166.66666666666666 53.333333333333336 146.66666666666666 80 140 C 106.66666666666666 133.33333333333334 100 166.66666666666666 120 160 C 140 153.33333333333334 146.66666666666666 146.66666666666666 140 120 C 133.33333333333334 93.33333333333334 100 106.66666666666666 100 80 C 100 53.333333333333336 126.66666666666667 53.33333333333333 140 40" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="case">
+      <h2>Case 4: Circular loop</h2>
+      <div class="row">
+        <div class="variant">
+          <h3>Curve intensity: 0 (straight)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="160" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="151.96152422706632" cy="130" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="130" cy="151.96152422706632" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="160" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="70.00000000000001" cy="151.96152422706632" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="48.03847577293368" cy="130" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="40" cy="100.00000000000001" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="48.03847577293367" cy="70.00000000000001" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="69.99999999999997" cy="48.038475772933694" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="99.99999999999999" cy="40" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="130" cy="48.03847577293369" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="151.96152422706632" cy="69.99999999999997" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="160" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><path d="M 160 100 C 160 100 151.96152422706632 130 151.96152422706632 130 C 151.96152422706632 130 130 151.96152422706632 130 151.96152422706632 C 130 151.96152422706632 100 160 100 160 C 100 160 70.00000000000001 151.96152422706632 70.00000000000001 151.96152422706632 C 70.00000000000001 151.96152422706632 48.03847577293368 130 48.03847577293368 130 C 48.03847577293368 130 40 100.00000000000001 40 100.00000000000001 C 40 100.00000000000001 48.03847577293367 70.00000000000001 48.03847577293367 70.00000000000001 C 48.03847577293367 70.00000000000001 69.99999999999997 48.038475772933694 69.99999999999997 48.038475772933694 C 69.99999999999997 48.038475772933694 99.99999999999999 40 99.99999999999999 40 C 99.99999999999999 40 130 48.03847577293369 130 48.03847577293369 C 130 48.03847577293369 151.96152422706632 69.99999999999997 151.96152422706632 69.99999999999997 C 151.96152422706632 69.99999999999997 160 100 160 100" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="variant">
+          <h3>Curve intensity: 1 (default)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="160" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="151.96152422706632" cy="130" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="130" cy="151.96152422706632" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="160" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="70.00000000000001" cy="151.96152422706632" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="48.03847577293368" cy="130" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="40" cy="100.00000000000001" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="48.03847577293367" cy="70.00000000000001" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="69.99999999999997" cy="48.038475772933694" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="99.99999999999999" cy="40" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="130" cy="48.03847577293369" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="151.96152422706632" cy="69.99999999999997" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="160" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><path d="M 160 100 C 158.6602540378444 105 156.96152422706632 121.33974596215562 151.96152422706632 130 C 146.96152422706632 138.6602540378444 138.6602540378444 146.96152422706632 130 151.96152422706632 C 121.33974596215562 156.96152422706632 110 160 100 160 C 90 160 78.6602540378444 156.96152422706632 70.00000000000001 151.96152422706632 C 61.33974596215563 146.96152422706632 53.03847577293368 138.6602540378444 48.03847577293368 130 C 43.03847577293368 121.33974596215562 40 110.00000000000001 40 100.00000000000001 C 40 90.00000000000001 43.03847577293368 78.6602540378444 48.03847577293367 70.00000000000001 C 53.038475772933666 61.33974596215563 61.33974596215559 53.038475772933694 69.99999999999997 48.038475772933694 C 78.66025403784435 43.038475772933694 89.99999999999999 40 99.99999999999999 40 C 109.99999999999999 40 121.3397459621556 43.038475772933694 130 48.03847577293369 C 138.6602540378444 53.03847577293368 146.96152422706632 61.33974596215559 151.96152422706632 69.99999999999997 C 156.96152422706632 78.66025403784435 158.6602540378444 95 160 100" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="variant">
+          <h3>Curve intensity: 2 (strong)</h3>
+          <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="0" y="0" width="200" height="200" fill="black" /><circle cx="160" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="151.96152422706632" cy="130" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="130" cy="151.96152422706632" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="100" cy="160" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="70.00000000000001" cy="151.96152422706632" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="48.03847577293368" cy="130" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="40" cy="100.00000000000001" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="48.03847577293367" cy="70.00000000000001" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="69.99999999999997" cy="48.038475772933694" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="99.99999999999999" cy="40" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="130" cy="48.03847577293369" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="151.96152422706632" cy="69.99999999999997" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><circle cx="160" cy="100" r="4" fill="#42a5f5" stroke="#000000" data-point-type="bolt" /><path d="M 160 100 C 157.32050807568876 110 161.96152422706632 112.67949192431124 151.96152422706632 130 C 141.96152422706632 147.32050807568876 147.32050807568876 141.96152422706632 130 151.96152422706632 C 112.67949192431124 161.96152422706632 120 160 100 160 C 80 160 87.32050807568879 161.96152422706632 70.00000000000001 151.96152422706632 C 52.67949192431124 141.96152422706632 58.03847577293368 147.32050807568876 48.03847577293368 130 C 38.03847577293368 112.67949192431124 40 120 40 100.00000000000001 C 40 80.00000000000003 38.03847577293368 87.32050807568879 48.03847577293367 70.00000000000001 C 58.038475772933666 52.67949192431124 52.6794919243112 58.038475772933694 69.99999999999997 48.038475772933694 C 87.32050807568874 38.038475772933694 79.99999999999997 40 99.99999999999999 40 C 120 40 112.67949192431122 38.038475772933694 130 48.03847577293369 C 147.3205080756888 58.03847577293368 141.96152422706632 52.6794919243112 151.96152422706632 69.99999999999997 C 161.96152422706632 87.32050807568874 157.32050807568876 89.99999999999999 160 100" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
