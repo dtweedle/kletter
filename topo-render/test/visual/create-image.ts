@@ -373,7 +373,7 @@ function buildCaseHtml(tc: TestCase): string {
             }
             for (const intensity of intensitySteps) {
                 const display = intensity === 1 ? "block" : "none";
-                inner += `<div class="intensity-frame" data-intensity="${intensity}" style="display:${display}">${intensityMap.get(intensity)}</div>`;
+                inner += `<div class="intensity-frame" data-intensity="${intensity.toFixed(1)}" style="display:${display}">${intensityMap.get(intensity)}</div>`;
             }
             inner += `</div>`;
         }
@@ -382,7 +382,7 @@ function buildCaseHtml(tc: TestCase): string {
         const intensityMap = caseMap.get(0)!;
         for (const intensity of intensitySteps) {
             const display = intensity === 1 ? "block" : "none";
-            inner += `<div class="intensity-frame" data-intensity="${intensity}" style="display:${display}">${intensityMap.get(intensity)}</div>`;
+            inner += `<div class="intensity-frame" data-intensity="${intensity.toFixed(1)}" style="display:${display}">${intensityMap.get(intensity)}</div>`;
         }
     }
 
@@ -474,18 +474,24 @@ const html = `
 ${casesHtml}
 
     <script>
+      // Grab references to the slider, numeric display, and all pre-rendered SVG frames.
       const slider = document.getElementById("intensity-slider");
       const display = document.getElementById("intensity-value");
       const frames = document.querySelectorAll(".intensity-frame");
 
+      // Update the display and toggle visibility of the frames that match the current intensity.
       function update() {
+        // Read the slider value and format it to one decimal place.
         const val = parseFloat(slider.value).toFixed(1);
         display.textContent = val;
+
+        // Show only the SVG frames whose data-intensity attribute matches the slider value.
         frames.forEach(function (el) {
           el.style.display = el.getAttribute("data-intensity") === val ? "block" : "none";
         });
       }
 
+      // Listen for slider input events and update on every change.
       slider.addEventListener("input", update);
     </script>
   </body>

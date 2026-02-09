@@ -1,8 +1,9 @@
 node_modules/
 
-# TypeScript build artifacts
+# build artifacts
 topo-render/src/**/*.js
 topo-render/test/**/*.js
+index.html
 
 # Logs
 npm-debug.log*
