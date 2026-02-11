@@ -239,11 +239,12 @@ export class TopoRender {
 
         // Render all points on top of the paths (deduplicated by reference).
         const renderedPoints = new Set<Point<PointType>>();
+        let pointIdCounter = 0;
         for (const route of routes) {
             for (const p of route.points) {
                 if (!renderedPoints.has(p)) {
                     renderedPoints.add(p);
-                    svgParts.push(p.render());
+                    svgParts.push(p.render(pointIdCounter++));
                 }
             }
         }

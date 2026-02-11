@@ -21,7 +21,7 @@ export class Point<PointT extends PointType> {
      * indicating the point type. The coordinates are assumed to already be
      * in the SVG canvas coordinate space.
      */
-    public render(): string {
+    public render(pointId?: number): string {
         const radius = 4;
 
         let fill = "#ffffff";
@@ -42,6 +42,7 @@ export class Point<PointT extends PointType> {
                 fill = "#ffffff";
         }
 
-        return `<circle cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${stroke}" data-point-type="${this.type}" />`;
+        const idAttr = pointId !== undefined ? ` data-point-id="${pointId}"` : "";
+        return `<circle class="topo-point"${idAttr} cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${stroke}" data-point-type="${this.type}" />`;
     }
 }

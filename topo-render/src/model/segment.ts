@@ -81,12 +81,12 @@ export class Segment {
         if (s.borderWidth > 0) {
             const borderStroke = s.strokeWidth + 2 * s.borderWidth;
             parts.push(
-                `<path d="${d}" fill="none" stroke="${s.borderColor}" stroke-width="${borderStroke}" stroke-linecap="round" stroke-linejoin="round" />`
+                `<path class="topo-path-border" d="${d}" fill="none" stroke="${s.borderColor}" stroke-width="${borderStroke}" stroke-linecap="round" stroke-linejoin="round" />`
             );
         }
 
         parts.push(
-            `<path d="${d}" fill="none" stroke="${s.strokeColor}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`
+            `<path class="topo-path" d="${d}" fill="none" stroke="${s.strokeColor}" stroke-width="${s.strokeWidth}" stroke-linecap="round" stroke-linejoin="round" />`
         );
 
         return parts.join("");
