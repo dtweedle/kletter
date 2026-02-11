@@ -396,13 +396,22 @@ function buildCaseHtml(tc: TestCase): string {
     </div>`;
 }
 
-const casesHtml = testCases.map(buildCaseHtml).join("\n");
+/**
+ * Build the pre-rendered test case HTML for all render cases.
+ * Exported so the combined visual test page can include it.
+ */
+export function buildRenderCasesHtml(): string {
+    return testCases.map(buildCaseHtml).join("\n");
+}
 
 // ---------------------------------------------------------------------------
-// Assemble the full HTML page
+// Standalone mode — write index.html when run directly
 // ---------------------------------------------------------------------------
 
-const html = `
+if (require.main === module) {
+    const casesHtml = buildRenderCasesHtml();
+
+    const html = `
 <!doctype html>
 <html lang="en">
   <head>
@@ -474,28 +483,22 @@ const html = `
 ${casesHtml}
 
     <script>
-      // Grab references to the slider, numeric display, and all pre-rendered SVG frames.
       const slider = document.getElementById("intensity-slider");
       const display = document.getElementById("intensity-value");
       const frames = document.querySelectorAll(".intensity-frame");
-
-      // Update the display and toggle visibility of the frames that match the current intensity.
       function update() {
-        // Read the slider value and format it to one decimal place.
         const val = parseFloat(slider.value).toFixed(1);
         display.textContent = val;
-
-        // Show only the SVG frames whose data-intensity attribute matches the slider value.
         frames.forEach(function (el) {
           el.style.display = el.getAttribute("data-intensity") === val ? "block" : "none";
         });
       }
-
-      // Listen for slider input events and update on every change.
       slider.addEventListener("input", update);
     </script>
   </body>
 </html>
 `;
 
-fs.writeFileSync("index.html", html);
+    fs.writeFileSync("index.html", html);
+    console.log("Generated index.html (render only)");
+}
