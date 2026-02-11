@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc -w",
-    "visual": "npm run build && node topo-render/test/visual/create-image.js",
+    "visual": "npm run build && node topo-editor/test/visual/create-image.js",
     "serve": "http-server -c-1 -p 3000 .",
     "dev": "npm run visual && npm run serve",
     "test": "npm run visual"

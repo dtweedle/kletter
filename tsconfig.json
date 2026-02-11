@@ -11,6 +11,8 @@
   },
   "include": [
     "topo-render/src/**/*.ts",
-    "topo-render/test/**/*.ts"
+    "topo-render/test/**/*.ts",
+    "topo-editor/src/**/*.ts",
+    "topo-editor/test/**/*.ts"
   ]
 }
