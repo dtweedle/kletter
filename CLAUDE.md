@@ -40,6 +40,11 @@ All source code is in `topo-render/src/`. TypeScript compiles to `.js` files in-
 - Always include detailed comments about what the code is doing
 - Use JSDoc decriptions where appropirate
 
+## Model Tracking and Consistency
+
+- If it doesn't already exist create a /.plans directory for tracking all of the executions that each model should write to once it's decided on a plan.
+- Each new plan should be added to a new plan-<plan#>.txt file where the `plan#` is simply an incrementing id begining at 1.
+
 ## Design Constraints
 
 - Avoid introducing runtime dependencies — the project is intentionally self-contained
