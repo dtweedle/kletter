@@ -35,6 +35,11 @@ All source code is in `topo-render/src/`. TypeScript compiles to `.js` files in-
 
 `topo-editor/` exists as a placeholder for a future interactive editor.
 
+## Code Standards
+
+- Always include detailed comments about what the code is doing
+- Use JSDoc decriptions where appropirate
+
 ## Design Constraints
 
 - Avoid introducing runtime dependencies — the project is intentionally self-contained
