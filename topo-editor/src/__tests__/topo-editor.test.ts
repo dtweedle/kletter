@@ -1,4 +1,4 @@
-import { TopoEditor, TopoEditorOptions } from '../topo-editor';
+import { TopoEditor, TopoEditorOptions, TopoEventType, TopoEventHandler } from '../topo-editor';
 import { TopoRender } from '../../../topo-render/src/topo-tool';
 import { Route } from '../../../topo-render/src/model/route';
 import { Point } from '../../../topo-render/src/model/point';
@@ -271,6 +271,81 @@ describe('TopoEditor', () => {
             const partialOptions3: TopoEditorOptions = {};
             const editor3 = new TopoEditor(renderer, partialOptions3);
             expect(editor3).toBeDefined();
+        });
+    });
+
+    describe('event listener API', () => {
+        it('should have instance-level on() and off() methods', () => {
+            const renderer = new TopoRender();
+            const editor = new TopoEditor(renderer);
+
+            expect(typeof editor.on).toBe('function');
+            expect(typeof editor.off).toBe('function');
+        });
+
+        it('should have static on() and off() methods', () => {
+            expect(typeof TopoEditor.on).toBe('function');
+            expect(typeof TopoEditor.off).toBe('function');
+        });
+
+        it('should accept valid event types on instance methods', () => {
+            const renderer = new TopoRender();
+            const editor = new TopoEditor(renderer);
+            const handler: TopoEventHandler = () => {};
+
+            // All supported event types should be accepted without error.
+            const eventTypes: TopoEventType[] = [
+                'hover:enter',
+                'hover:leave',
+                'click',
+                'focus',
+                'blur',
+            ];
+
+            for (const type of eventTypes) {
+                expect(() => editor.on(type, handler)).not.toThrow();
+                expect(() => editor.off(type, handler)).not.toThrow();
+            }
+        });
+
+        it('should accept valid event types on static methods', () => {
+            const handler: TopoEventHandler = () => {};
+
+            const eventTypes: TopoEventType[] = [
+                'hover:enter',
+                'hover:leave',
+                'click',
+                'focus',
+                'blur',
+            ];
+
+            for (const type of eventTypes) {
+                expect(() => TopoEditor.on(type, handler)).not.toThrow();
+                // Clean up to avoid cross-test pollution.
+                expect(() => TopoEditor.off(type, handler)).not.toThrow();
+            }
+        });
+
+        it('should clear instance-level handlers on destroy()', () => {
+            const renderer = new TopoRender();
+            const editor = new TopoEditor(renderer);
+            const handler: TopoEventHandler = () => {};
+
+            editor.on('click', handler);
+            // destroy() should not throw and should clear instance handlers.
+            expect(() => editor.destroy()).not.toThrow();
+        });
+
+        it('should not affect global handlers when an instance is destroyed', () => {
+            const renderer = new TopoRender();
+            const editor = new TopoEditor(renderer);
+            const globalHandler: TopoEventHandler = () => {};
+
+            TopoEditor.on('click', globalHandler);
+            editor.destroy();
+
+            // Global handler should still be removable (i.e. it was not cleared).
+            expect(() => TopoEditor.off('click', globalHandler)).not.toThrow();
         });
     });
 });

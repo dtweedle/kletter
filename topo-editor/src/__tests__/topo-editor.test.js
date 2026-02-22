@@ -215,4 +215,65 @@ describe('TopoEditor', () => {
             expect(editor3).toBeDefined();
         });
     });
+    describe('event listener API', () => {
+        it('should have instance-level on() and off() methods', () => {
+            const renderer = new topo_tool_1.TopoRender();
+            const editor = new topo_editor_1.TopoEditor(renderer);
+            expect(typeof editor.on).toBe('function');
+            expect(typeof editor.off).toBe('function');
+        });
+        it('should have static on() and off() methods', () => {
+            expect(typeof topo_editor_1.TopoEditor.on).toBe('function');
+            expect(typeof topo_editor_1.TopoEditor.off).toBe('function');
+        });
+        it('should accept valid event types on instance methods', () => {
+            const renderer = new topo_tool_1.TopoRender();
+            const editor = new topo_editor_1.TopoEditor(renderer);
+            const handler = () => { };
+            // All supported event types should be accepted without error.
+            const eventTypes = [
+                'hover:enter',
+                'hover:leave',
+                'click',
+                'focus',
+                'blur',
+            ];
+            for (const type of eventTypes) {
+                expect(() => editor.on(type, handler)).not.toThrow();
+                expect(() => editor.off(type, handler)).not.toThrow();
+            }
+        });
+        it('should accept valid event types on static methods', () => {
+            const handler = () => { };
+            const eventTypes = [
+                'hover:enter',
+                'hover:leave',
+                'click',
+                'focus',
+                'blur',
+            ];
+            for (const type of eventTypes) {
+                expect(() => topo_editor_1.TopoEditor.on(type, handler)).not.toThrow();
+                // Clean up to avoid cross-test pollution.
+                expect(() => topo_editor_1.TopoEditor.off(type, handler)).not.toThrow();
+            }
+        });
+        it('should clear instance-level handlers on destroy()', () => {
+            const renderer = new topo_tool_1.TopoRender();
+            const editor = new topo_editor_1.TopoEditor(renderer);
+            const handler = () => { };
+            editor.on('click', handler);
+            // destroy() should not throw and should clear instance handlers.
+            expect(() => editor.destroy()).not.toThrow();
+        });
+        it('should not affect global handlers when an instance is destroyed', () => {
+            const renderer = new topo_tool_1.TopoRender();
+            const editor = new topo_editor_1.TopoEditor(renderer);
+            const globalHandler = () => { };
+            topo_editor_1.TopoEditor.on('click', globalHandler);
+            editor.destroy();
+            // Global handler should still be removable (i.e. it was not cleared).
+            expect(() => topo_editor_1.TopoEditor.off('click', globalHandler)).not.toThrow();
+        });
+    });
 });
