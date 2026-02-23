@@ -2,6 +2,15 @@ import { TopoRender } from "../../topo-render/src/topo-tool";
 import { Point, PointType } from "../../topo-render/src/model/point";
 import { Route } from "../../topo-render/src/model/route";
 import { SegmentStyle } from "../../topo-render/src/model/segment";
+import {
+    TopoEventEmitter,
+    TopoEventType,
+    TopoEvent,
+    TopoEventHandler,
+} from "./topo-event-emitter";
+
+// Re-export event types for consumers importing from this module.
+export { TopoEventType, TopoEvent, TopoEventHandler } from "./topo-event-emitter";
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -177,6 +186,45 @@ export class TopoEditor {
     /** Bound `mouseleave` handler. */
     private boundMouseLeave: () => void;
 
+    // -----------------------------------------------------------------------
+    // Event system
+    // -----------------------------------------------------------------------
+
+    /**
+     * Class-level (global) event emitter. Fires for events from ANY
+     * TopoEditor instance. Shared across all instances.
+     */
+    private static globalEmitter: TopoEventEmitter = new TopoEventEmitter();
+
+    /**
+     * Instance-level event emitter. Fires only for events from THIS
+     * editor instance.
+     */
+    private emitter: TopoEventEmitter = new TopoEventEmitter();
+
+    /**
+     * The element currently under the cursor for hover tracking.
+     * Used to correctly emit `hover:enter` and `hover:leave` without
+     * duplicate fires caused by mouseover/mouseout bubbling through
+     * child elements.
+     */
+    private hoveredElement: Element | null = null;
+
+    /** Bound `mouseover` handler for hover:enter delegation. */
+    private boundMouseOver: (evt: MouseEvent) => void;
+
+    /** Bound `mouseout` handler for hover:leave delegation. */
+    private boundMouseOut: (evt: MouseEvent) => void;
+
+    /** Bound `click` handler for click event delegation. */
+    private boundClick: (evt: MouseEvent) => void;
+
+    /** Bound `focusin` handler for focus event delegation. */
+    private boundFocusIn: (evt: FocusEvent) => void;
+
+    /** Bound `focusout` handler for blur event delegation. */
+    private boundFocusOut: (evt: FocusEvent) => void;
+
     /**
      * Create a new TopoEditor.
      *
@@ -197,6 +245,13 @@ export class TopoEditor {
         this.boundMouseMove = this.handleMouseMove.bind(this);
         this.boundMouseUp = this.endDrag.bind(this);
         this.boundMouseLeave = this.endDrag.bind(this);
+
+        // Pre-bind delegated event handlers for the public event system.
+        this.boundMouseOver = this.handleMouseOver.bind(this);
+        this.boundMouseOut = this.handleMouseOut.bind(this);
+        this.boundClick = this.handleClick.bind(this);
+        this.boundFocusIn = this.handleFocusIn.bind(this);
+        this.boundFocusOut = this.handleFocusOut.bind(this);
     }
 
     // -----------------------------------------------------------------------
@@ -264,13 +319,90 @@ export class TopoEditor {
         this.rebuildAllRoutes();
     }
 
+    // -----------------------------------------------------------------------
+    // Event listener API
+    // -----------------------------------------------------------------------
+
+    /**
+     * Register an event handler on THIS editor instance.
+     *
+     * The handler fires only for events originating from this editor's
+     * SVG. Use the static {@link TopoEditor.on} for cross-instance events.
+     *
+     * @param type    - The topo event type (e.g. `"click"`, `"hover:enter"`).
+     * @param handler - Callback invoked with a {@link TopoEvent} payload.
+     *
+     * @example
+     * ```ts
+     * editor.on('click', (evt) => {
+     *     console.log('Clicked point', evt.pointId);
+     * });
+     * ```
+     */
+    public on(type: TopoEventType, handler: TopoEventHandler): void {
+        this.emitter.on(type, handler);
+    }
+
+    /**
+     * Remove a previously registered instance-level event handler.
+     *
+     * @param type    - The topo event type.
+     * @param handler - The exact function reference passed to {@link on}.
+     */
+    public off(type: TopoEventType, handler: TopoEventHandler): void {
+        this.emitter.off(type, handler);
+    }
+
+    /**
+     * Register an event handler at the CLASS level (global).
+     *
+     * Global handlers fire for events from ANY mounted TopoEditor
+     * instance. Useful for cross-instance coordination (e.g. a
+     * toolbar that responds to whichever editor the user interacts
+     * with).
+     *
+     * @param type    - The topo event type.
+     * @param handler - Callback invoked with a {@link TopoEvent} payload.
+     *
+     * @example
+     * ```ts
+     * TopoEditor.on('hover:enter', (evt) => {
+     *     console.log('Hovered point', evt.pointId, 'on instance', evt.instance);
+     * });
+     * ```
+     */
+    public static on(type: TopoEventType, handler: TopoEventHandler): void {
+        TopoEditor.globalEmitter.on(type, handler);
+    }
+
+    /**
+     * Remove a previously registered class-level (global) event handler.
+     *
+     * @param type    - The topo event type.
+     * @param handler - The exact function reference passed to the static
+     *   {@link TopoEditor.on}.
+     */
+    public static off(type: TopoEventType, handler: TopoEventHandler): void {
+        TopoEditor.globalEmitter.off(type, handler);
+    }
+
+    // -----------------------------------------------------------------------
+    // Lifecycle
+    // -----------------------------------------------------------------------
+
     /**
      * Tear down the editor: remove event listeners and release DOM
      * references. Call this before discarding the editor instance to
      * prevent memory leaks.
+     *
+     * Instance-level event handlers are cleared. Global handlers
+     * registered via {@link TopoEditor.on} are NOT affected — they
+     * are expected to outlive individual instances.
      */
     public destroy(): void {
         this.unbindEvents();
+        this.emitter.removeAll();
+        this.hoveredElement = null;
         this.container = null;
         this.svg = null;
     }
@@ -357,6 +489,8 @@ export class TopoEditor {
             const id = parseInt(el.getAttribute("data-point-id") ?? "", 10);
             if (!isNaN(id)) {
                 this.circleElements.set(id, el as SVGCircleElement);
+                // Make points keyboard-focusable for focus/blur events.
+                el.setAttribute("tabindex", "0");
             }
         });
     }
@@ -391,7 +525,8 @@ export class TopoEditor {
         const firstCircle = this.svg!.querySelector(".topo-point");
         this.routePathElements = [];
 
-        for (const r of this.routes) {
+        for (let ri = 0; ri < this.routes.length; ri++) {
+            const r = this.routes[ri];
             const pts = r.pointIds.map((id) => this.points.get(id)!);
             const d = this.buildPathD(pts);
 
@@ -410,6 +545,8 @@ export class TopoEditor {
                     borderStroke,
                     "topo-path-border"
                 );
+                // Tag path with route index for event identification.
+                els.border.setAttribute("data-route-index", String(ri));
                 this.svg!.insertBefore(els.border, firstCircle);
             }
 
@@ -420,6 +557,8 @@ export class TopoEditor {
                 r.style.strokeWidth,
                 "topo-path"
             );
+            // Tag path with route index for event identification.
+            els.main.setAttribute("data-route-index", String(ri));
             this.svg!.insertBefore(els.main, firstCircle);
             this.routePathElements.push(els);
         }
@@ -566,24 +705,38 @@ export class TopoEditor {
     // -----------------------------------------------------------------------
 
     /**
-     * Attach mouse event listeners to the SVG element for drag
-     * interaction. Uses the pre-bound handler references so that
-     * {@link unbindEvents} can remove them later.
+     * Attach event listeners to the SVG element for drag interaction
+     * and the public event system. Uses pre-bound handler references
+     * so that {@link unbindEvents} can remove them later.
+     *
+     * All listeners are delegated on the SVG root — there is never
+     * more than one DOM binding per event type.
      */
     private bindEvents(): void {
         const svg = this.svg!;
+
+        // Drag handlers.
         svg.addEventListener("mousedown", this.boundMouseDown as EventListener);
         svg.addEventListener("mousemove", this.boundMouseMove as EventListener);
         svg.addEventListener("mouseup", this.boundMouseUp);
         svg.addEventListener("mouseleave", this.boundMouseLeave);
+
+        // Public event system delegation handlers.
+        svg.addEventListener("mouseover", this.boundMouseOver as EventListener);
+        svg.addEventListener("mouseout", this.boundMouseOut as EventListener);
+        svg.addEventListener("click", this.boundClick as EventListener);
+        svg.addEventListener("focusin", this.boundFocusIn as EventListener);
+        svg.addEventListener("focusout", this.boundFocusOut as EventListener);
     }
 
     /**
-     * Remove all mouse event listeners from the SVG element.
+     * Remove all event listeners from the SVG element.
      * Called by {@link destroy}.
      */
     private unbindEvents(): void {
         if (!this.svg) return;
+
+        // Drag handlers.
         this.svg.removeEventListener(
             "mousedown",
             this.boundMouseDown as EventListener
@@ -594,6 +747,28 @@ export class TopoEditor {
         );
         this.svg.removeEventListener("mouseup", this.boundMouseUp);
         this.svg.removeEventListener("mouseleave", this.boundMouseLeave);
+
+        // Public event system delegation handlers.
+        this.svg.removeEventListener(
+            "mouseover",
+            this.boundMouseOver as EventListener
+        );
+        this.svg.removeEventListener(
+            "mouseout",
+            this.boundMouseOut as EventListener
+        );
+        this.svg.removeEventListener(
+            "click",
+            this.boundClick as EventListener
+        );
+        this.svg.removeEventListener(
+            "focusin",
+            this.boundFocusIn as EventListener
+        );
+        this.svg.removeEventListener(
+            "focusout",
+            this.boundFocusOut as EventListener
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -703,5 +878,226 @@ export class TopoEditor {
         const circle = this.circleElements.get(this.dragPointId);
         if (circle) circle.classList.remove("dragging");
         this.dragPointId = null;
+    }
+
+    // -----------------------------------------------------------------------
+    // Event emission helpers
+    // -----------------------------------------------------------------------
+
+    /**
+     * Identify the nearest topo-relevant ancestor of a DOM event target.
+     *
+     * Walks up from `el` to find the first element with class
+     * `topo-point`, `topo-path`, or `topo-path-border`. Returns `null`
+     * if the target is the SVG background or an unrelated element.
+     *
+     * @param el - The raw event target element.
+     * @returns The topo-relevant element, or `null`.
+     */
+    private findTopoTarget(el: Element | null): Element | null {
+        while (el && el !== this.svg) {
+            if (
+                el.classList.contains("topo-point") ||
+                el.classList.contains("topo-path") ||
+                el.classList.contains("topo-path-border")
+            ) {
+                return el;
+            }
+            el = el.parentElement;
+        }
+        return null;
+    }
+
+    /**
+     * Build a {@link TopoEvent} payload from a DOM event and its
+     * topo-relevant target element.
+     *
+     * Extracts `data-point-id`, `data-point-type`, and `data-route-index`
+     * attributes to populate the semantic fields. Uses
+     * {@link pointToRouteIndices} for the `routeIndices` array.
+     *
+     * @param type          - The topo event type to assign.
+     * @param target        - The topo-relevant SVG element.
+     * @param originalEvent - The raw DOM event.
+     * @returns A fully populated {@link TopoEvent}.
+     */
+    private buildTopoEvent(
+        type: TopoEventType,
+        target: Element,
+        originalEvent: Event
+    ): TopoEvent {
+        let pointId: number | null = null;
+        let pointType: string | null = null;
+        let routeIndex: number | null = null;
+        let routeIndices: number[] = [];
+
+        if (target.classList.contains("topo-point")) {
+            // Target is a point circle.
+            const rawId = target.getAttribute("data-point-id");
+            if (rawId !== null) {
+                pointId = parseInt(rawId, 10);
+                if (isNaN(pointId)) pointId = null;
+            }
+            pointType = target.getAttribute("data-point-type");
+            if (pointId !== null) {
+                routeIndices = this.pointToRouteIndices.get(pointId) ?? [];
+            }
+        } else if (
+            target.classList.contains("topo-path") ||
+            target.classList.contains("topo-path-border")
+        ) {
+            // Target is a path element.
+            const rawIdx = target.getAttribute("data-route-index");
+            if (rawIdx !== null) {
+                routeIndex = parseInt(rawIdx, 10);
+                if (isNaN(routeIndex)) routeIndex = null;
+            }
+        }
+
+        return {
+            type,
+            pointId,
+            pointType,
+            routeIndex,
+            routeIndices,
+            target,
+            originalEvent,
+            instance: this,
+        };
+    }
+
+    /**
+     * Emit a topo event to both the instance-level and class-level
+     * (global) emitters.
+     *
+     * @param event - The topo event payload.
+     */
+    private emitTopoEvent(event: TopoEvent): void {
+        this.emitter.emit(event);
+        TopoEditor.globalEmitter.emit(event);
+    }
+
+    // -----------------------------------------------------------------------
+    // Hover tracking (mouseover / mouseout delegation)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Handle delegated `mouseover` on the SVG root.
+     *
+     * `mouseover` bubbles, so it fires when entering child elements.
+     * We track {@link hoveredElement} to deduplicate: only emit
+     * `hover:enter` when the topo-relevant target actually changes.
+     *
+     * @param evt - The mouseover event.
+     */
+    private handleMouseOver(evt: MouseEvent): void {
+        const topoTarget = this.findTopoTarget(evt.target as Element);
+
+        // If we're still over the same topo element, ignore (dedup).
+        if (topoTarget === this.hoveredElement) return;
+
+        // If we were hovering something before, emit hover:leave for it.
+        if (this.hoveredElement) {
+            const leaveEvent = this.buildTopoEvent(
+                "hover:leave",
+                this.hoveredElement,
+                evt
+            );
+            this.emitTopoEvent(leaveEvent);
+        }
+
+        // Update tracked element.
+        this.hoveredElement = topoTarget;
+
+        // If we are now over a topo element, emit hover:enter.
+        if (topoTarget) {
+            const enterEvent = this.buildTopoEvent(
+                "hover:enter",
+                topoTarget,
+                evt
+            );
+            this.emitTopoEvent(enterEvent);
+        }
+    }
+
+    /**
+     * Handle delegated `mouseout` on the SVG root.
+     *
+     * When the cursor leaves the SVG entirely, we need to emit a
+     * final `hover:leave` for whatever was hovered. For moves between
+     * SVG children, `handleMouseOver` handles the transition.
+     *
+     * @param evt - The mouseout event.
+     */
+    private handleMouseOut(evt: MouseEvent): void {
+        // relatedTarget is the element the cursor moved TO.
+        // If it's outside the SVG (or null), the cursor left entirely.
+        const related = evt.relatedTarget as Element | null;
+        const stillInSvg = related && this.svg!.contains(related);
+
+        if (!stillInSvg && this.hoveredElement) {
+            const leaveEvent = this.buildTopoEvent(
+                "hover:leave",
+                this.hoveredElement,
+                evt
+            );
+            this.emitTopoEvent(leaveEvent);
+            this.hoveredElement = null;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Click delegation
+    // -----------------------------------------------------------------------
+
+    /**
+     * Handle delegated `click` on the SVG root.
+     *
+     * Only emits a topo `click` event if the click target is a
+     * topo-relevant element (point or path). Clicks on the background
+     * are ignored.
+     *
+     * @param evt - The click event.
+     */
+    private handleClick(evt: MouseEvent): void {
+        const topoTarget = this.findTopoTarget(evt.target as Element);
+        if (!topoTarget) return;
+
+        const topoEvent = this.buildTopoEvent("click", topoTarget, evt);
+        this.emitTopoEvent(topoEvent);
+    }
+
+    // -----------------------------------------------------------------------
+    // Focus / blur delegation (focusin / focusout)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Handle delegated `focusin` on the SVG root.
+     *
+     * `focusin` bubbles (unlike `focus`), making it suitable for event
+     * delegation. Only fires for elements with `tabindex` — which we
+     * set on `.topo-point` circles in {@link collectCircleElements}.
+     *
+     * @param evt - The focusin event.
+     */
+    private handleFocusIn(evt: FocusEvent): void {
+        const topoTarget = this.findTopoTarget(evt.target as Element);
+        if (!topoTarget) return;
+
+        const topoEvent = this.buildTopoEvent("focus", topoTarget, evt);
+        this.emitTopoEvent(topoEvent);
+    }
+
+    /**
+     * Handle delegated `focusout` on the SVG root.
+     *
+     * @param evt - The focusout event.
+     */
+    private handleFocusOut(evt: FocusEvent): void {
+        const topoTarget = this.findTopoTarget(evt.target as Element);
+        if (!topoTarget) return;
+
+        const topoEvent = this.buildTopoEvent("blur", topoTarget, evt);
+        this.emitTopoEvent(topoEvent);
     }
 }

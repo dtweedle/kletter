@@ -255,9 +255,16 @@ const MODULE_DEFS = [
         requireMap: { '"./model/segment"': '"segment"' },
     },
     {
+        name: "topo-event-emitter",
+        file: "topo-editor/src/topo-event-emitter.js",
+        requireMap: {},
+    },
+    {
         name: "topo-editor",
         file: "topo-editor/src/topo-editor.js",
-        requireMap: {},
+        requireMap: {
+            '"./topo-event-emitter"': '"topo-event-emitter"',
+        },
     },
 ];
 /**
