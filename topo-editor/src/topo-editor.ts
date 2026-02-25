@@ -1,5 +1,5 @@
 import { TopoRender } from "../../topo-render/src/topo-tool";
-import { Point, PointType } from "../../topo-render/src/model/point";
+import { Point, PointType, PointStyle } from "../../topo-render/src/model/point";
 import { Route } from "../../topo-render/src/model/route";
 import { SegmentStyle } from "../../topo-render/src/model/segment";
 import {
@@ -48,6 +48,14 @@ export interface TopoEditorOptions {
      * @defaultValue 1
      */
     curveIntensity?: number;
+
+    /**
+     * Default point style. Stored for potential future use (e.g. live
+     * style updates) but does not affect the initial render — that is
+     * handled by the injected {@link TopoRender} instance's own
+     * `pointStyle` option.
+     */
+    pointStyle?: PointStyle;
 }
 
 // ---------------------------------------------------------------------------
