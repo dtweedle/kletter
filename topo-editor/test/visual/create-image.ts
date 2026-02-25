@@ -744,7 +744,7 @@ ${editorCasesScript}
           "blur":        "elog-blur"
         };
 
-        // Append one log entry and manage list size + auto-scroll
+        // Prepend one log entry (newest at top) and manage list size
         function logEvent(evt) {
           var meta = window.__topoMeta ? window.__topoMeta.get(evt.instance) : null;
           var caseLabel  = meta ? meta.caseId  : "?";
@@ -773,16 +773,13 @@ ${editorCasesScript}
             "<span class='elog-type " + cls + "'>" + evt.type + "</span>" +
             "<span class='elog-case'>[" + caseLabel + "]</span>" +
             "<span class='elog-detail'>" + detail + "</span>";
-          logList.appendChild(li);
+          // Prepend so the newest entry always appears at the top
+          logList.insertBefore(li, logList.firstChild);
 
-          // Trim oldest entries beyond the cap to prevent unbounded growth
+          // Trim oldest entries (now at the bottom) beyond the cap
           while (logList.children.length > MAX_ENTRIES) {
-            logList.removeChild(logList.firstChild);
+            logList.removeChild(logList.lastChild);
           }
-
-          // Auto-scroll only when already at the bottom
-          var atBottom = logBody.scrollHeight - logBody.scrollTop <= logBody.clientHeight + 4;
-          if (atBottom) logBody.scrollTop = logBody.scrollHeight;
         }
 
         // Bind all 5 event types globally (fires for any mounted TopoEditor instance)
