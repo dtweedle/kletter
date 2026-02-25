@@ -40,6 +40,12 @@ All source code is in `topo-render/src/`. TypeScript compiles to `.js` files in-
 - Always include detailed comments about what the code is doing
 - Use JSDoc decriptions where appropirate
 
+## Branching and Workflow
+
+- Every task must begin by creating a plan and checking out a new branch from `master`.
+- Branch names must follow the convention: `fix/<branch-name>` for bug fixes or `feature/<branch-name>` for new features.
+- Do not commit directly to `master`.
+
 ## Model Tracking and Consistency
 
 - If it doesn't already exist create a /.plans directory for tracking all of the executions that each model should write to once it's decided on a plan.
