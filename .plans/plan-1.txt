@@ -1,0 +1,29 @@
+Plan: Fix junction tangent — use averaged angle of all unique paths
+
+Problem:
+  Current code picks the single unique path with the smallest angle to the
+  shared segment axis and forces all paths (including the shared segment)
+  to match that one direction. This causes visible kinking because the
+  shared segment bends unnaturally toward one branch.
+
+Solution:
+  At each junction point, compute the AVERAGE direction of all unique
+  (non-shared) paths arriving at or departing from that point. The average
+  is computed by summing the unit direction vectors and normalizing the
+  result. This places the shared segment's tangent exactly in the middle
+  of all branches (e.g. the trunk of a Y goes straight up when two
+  branches splay equally left and right).
+
+  Fallback: if no unique paths exist at a junction, use the shared
+  segment's own natural axis (unchanged from current behaviour).
+
+Files to change:
+  1. topo-render/src/topo-tool.ts — convergence & divergence ref computation
+     - Replace max-dot-product selection with vector sum + normalize
+     - Update JSDoc comment block to describe averaged approach
+
+  2. topo-editor/src/topo-editor.ts — computeJunctionRefs()
+     - Same logic change: sum unique path directions, normalize
+
+Both changes are localised to ~10 lines each (the inner loops that
+currently track maxDot and pick a single winner).

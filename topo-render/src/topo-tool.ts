@@ -177,11 +177,17 @@ export class TopoRender {
         // including the shared segment itself—must arrive/depart in exactly the
         // same direction so the join looks seamless.
         //
-        // We choose this "reference direction" as the natural arrival/departure
-        // direction of whichever unique path makes the SMALLEST angle with the
-        // shared segment's own axis (largest dot product). This avoids pulling
-        // every route toward an averaged direction that none of them naturally
-        // approaches from.
+        // The "reference direction" is computed at BOTH endpoints of each shared
+        // sub-path. At each junction, ALL unique paths — both arrivals and
+        // departures — contribute to a single averaged direction. Departures are
+        // negated so they point toward the shared interior, making them
+        // comparable with arrivals. The average sits exactly between all
+        // branches (e.g. a Y-junction trunk goes straight when two branches
+        // splay equally left and right).
+        //
+        // The divergence ref is the negation of the convergence ref. This
+        // guarantees that opposite-direction routes produce reversal-compatible
+        // Bézier curves through the shared segment.
         //
         // If no unique paths exist at a junction (e.g. the shared segment starts
         // at the very first point of every route) the shared segment's own
@@ -189,25 +195,19 @@ export class TopoRender {
         //
         // Formulae (Catmull–Rom → cubic Bézier, factor = intensity/6):
         //
-        //   Convergence (unique → shared, junction = firstPt of shared):
-        //     sharedAxis  = normalize(interiorFirst − junction)
-        //     refDir      = natDir of min-angle unique arrival
+        //   At each junction J with adjacent interior point I:
+        //     sharedAxis  = normalize(I − J)
+        //     refDir      = normalize( Σ approach_i )
+        //       where approach_i = normalize(J − pPrev) for arrivals
+        //                        = normalize(J − pNext) for departures (negated)
         //
-        //     Unique sub-path p3Override (per-path, scaled by |junction − p_prev|):
-        //       p3Override = p_prev + |junction − p_prev| × refDir
+        //   Convergence (convRef = refDir, points INTO shared segment):
+        //     Unique sub-path p3Override:  p_prev + |J − p_prev| × convRef
+        //     Shared segment  p0Override:  I − |I − J| × convRef
         //
-        //     Shared segment p0Override:
-        //       p0Override = interiorFirst − |interiorFirst − junction| × refDir
-        //
-        //   Divergence (shared → unique, junction = lastPt of shared):
-        //     sharedAxis  = normalize(junction − interiorLast)
-        //     refDir      = natDir of min-angle unique departure
-        //
-        //     Unique sub-path p0Override (per-path, scaled by |p_next − junction|):
-        //       p0Override = p_next − |p_next − junction| × refDir
-        //
-        //     Shared segment p3Override:
-        //       p3Override = interiorLast + |junction − interiorLast| × refDir
+        //   Divergence  (divRef = −refDir, points AWAY from shared segment):
+        //     Unique sub-path p0Override:  p_next − |p_next − J| × divRef
+        //     Shared segment  p3Override:  I + |J − I| × divRef
         // -----------------------------------------------------------------------
 
         interface JunctionRef {
@@ -243,147 +243,154 @@ export class TopoRender {
             const interiorFirst = sp.points[1];
             const interiorLast  = sp.points[sp.points.length - 2];
 
-            // ---- Convergence ----
-            // Shared segment's natural departure axis at firstPt.
-            const sharedDepartAxis = vecNorm({
-                x: interiorFirst.x - firstPt.x,
-                y: interiorFirst.y - firstPt.y,
-            });
+            // Process BOTH endpoints of the shared segment. Each endpoint may
+            // serve as convergence (unique→shared) for some routes and divergence
+            // (shared→unique) for routes traversing in the opposite direction.
+            const endpoints: Array<[Point<PointType>, Point<PointType>]> = [
+                [firstPt, interiorFirst],
+                [lastPt,  interiorLast],
+            ];
 
-            // Scan unique paths arriving at firstPt; pick the one whose natural
-            // arrival direction has the smallest angle to the shared axis.
-            let convRefDir = sharedDepartAxis;
-            let convMaxDot = -2;
+            for (const [junctionPt, interiorPt] of endpoints) {
+                // Skip if already processed by a previous shared sub-path.
+                if (convergenceRefs.has(junctionPt)) continue;
 
-            for (const up of (uniqueEndingAt.get(firstPt) ?? [])) {
-                const pPrev  = up.points[up.points.length - 2];
-                const natDir = vecNorm({
-                    x: firstPt.x - pPrev.x,
-                    y: firstPt.y - pPrev.y,
+                // Shared axis: direction from junction into the shared segment.
+                const sharedAxis = vecNorm({
+                    x: interiorPt.x - junctionPt.x,
+                    y: interiorPt.y - junctionPt.y,
                 });
-                const dot = natDir.x * sharedDepartAxis.x + natDir.y * sharedDepartAxis.y;
-                if (dot > convMaxDot) { convMaxDot = dot; convRefDir = natDir; }
-            }
 
-            convergenceRefs.set(firstPt, { refDir: convRefDir, sharedInteriorPt: interiorFirst });
+                // Average the "approach" directions of ALL unique paths at this
+                // junction. Arrivals naturally point toward the shared interior.
+                // Departures are negated so they also point toward the shared
+                // interior, making all directions comparable for averaging.
+                let sumX = 0, sumY = 0;
+                let count = 0;
 
-            // ---- Divergence ----
-            const sharedArrivalAxis = vecNorm({
-                x: lastPt.x - interiorLast.x,
-                y: lastPt.y - interiorLast.y,
-            });
+                // Unique paths arriving at this junction.
+                for (const up of (uniqueEndingAt.get(junctionPt) ?? [])) {
+                    const pPrev  = up.points[up.points.length - 2];
+                    const natDir = vecNorm({
+                        x: junctionPt.x - pPrev.x,
+                        y: junctionPt.y - pPrev.y,
+                    });
+                    sumX += natDir.x;
+                    sumY += natDir.y;
+                    count++;
+                }
 
-            let divRefDir = sharedArrivalAxis;
-            let divMaxDot = -2;
+                // Unique paths departing from this junction (negated to match
+                // the "toward shared interior" convention).
+                for (const up of (uniqueStartingAt.get(junctionPt) ?? [])) {
+                    const pNext  = up.points[1];
+                    const natDir = vecNorm({
+                        x: junctionPt.x - pNext.x,
+                        y: junctionPt.y - pNext.y,
+                    });
+                    sumX += natDir.x;
+                    sumY += natDir.y;
+                    count++;
+                }
 
-            for (const up of (uniqueStartingAt.get(lastPt) ?? [])) {
-                const pNext  = up.points[1];
-                const natDir = vecNorm({
-                    x: pNext.x - lastPt.x,
-                    y: pNext.y - lastPt.y,
+                let refDir = sharedAxis;
+                if (count > 0) {
+                    const avg = vecNorm({ x: sumX, y: sumY });
+                    if (avg.x !== 0 || avg.y !== 0) {
+                        refDir = avg;
+                    }
+                }
+
+                // Convergence ref points INTO the shared segment.
+                convergenceRefs.set(junctionPt, {
+                    refDir,
+                    sharedInteriorPt: interiorPt,
                 });
-                const dot = natDir.x * sharedArrivalAxis.x + natDir.y * sharedArrivalAxis.y;
-                if (dot > divMaxDot) { divMaxDot = dot; divRefDir = natDir; }
+                // Divergence ref is the negation — ensures opposite-direction
+                // routes produce reversal-compatible Bézier curves through the
+                // shared segment.
+                divergenceRefs.set(junctionPt, {
+                    refDir: { x: -refDir.x, y: -refDir.y },
+                    sharedInteriorPt: interiorPt,
+                });
             }
-
-            divergenceRefs.set(lastPt, { refDir: divRefDir, sharedInteriorPt: interiorLast });
         }
 
-        // Render shared segments with a slightly thicker stroke so they
-        // are visually distinct from per-route segments.
-        // The boundary tangents are forced to the reference direction so the
-        // rendered path is identical regardless of which or how many unique
-        // sub-paths are attached to it.
-        const sharedStyle: SegmentStyle = {
-            strokeWidth: (this.segmentStyle?.strokeWidth ?? 2) + 1,
-            strokeColor: this.segmentStyle?.strokeColor ?? '#ffffff',
-            borderWidth: this.segmentStyle?.borderWidth ?? 0,
-            borderColor: this.segmentStyle?.borderColor ?? '#000000',
-        };
+        // Render each route as a complete per-route path with junction
+        // overrides at shared-segment boundaries. This preserves per-route
+        // styling (colour, width) through shared sections while the junction
+        // overrides ensure all routes produce identical Bézier curves through
+        // the shared portion.
+        for (let ri = 0; ri < routes.length; ri++) {
+            const route = routes[ri];
+            const pts   = route.points;
+            if (pts.length < 2) continue;
 
-        for (const sp of sharedSubPaths) {
-            if (sp.points.length < 2) continue;
-
-            const firstPt = sp.points[0];
-            const lastPt  = sp.points[sp.points.length - 1];
-
-            let p0Override: { x: number; y: number } | undefined;
-            let p3Override: { x: number; y: number } | undefined;
-
-            const convRef = convergenceRefs.get(firstPt);
-            if (convRef) {
-                // c1 = firstPt + (interiorFirst − p0Override) × factor
-                // For departure direction = refDir:
-                //   interiorFirst − p0Override = dist × refDir
-                //   p0Override = interiorFirst − dist × refDir
-                const si   = convRef.sharedInteriorPt;
-                const dist = vecLen({ x: si.x - firstPt.x, y: si.y - firstPt.y });
-                p0Override = {
-                    x: si.x - dist * convRef.refDir.x,
-                    y: si.y - dist * convRef.refDir.y,
-                };
-            }
-
-            const divRef = divergenceRefs.get(lastPt);
-            if (divRef) {
-                // c2 = lastPt − (p3Override − interiorLast) × factor
-                // For arrival direction = refDir:
-                //   p3Override − interiorLast = dist × refDir
-                //   p3Override = interiorLast + dist × refDir
-                const si   = divRef.sharedInteriorPt;
-                const dist = vecLen({ x: lastPt.x - si.x, y: lastPt.y - si.y });
-                p3Override = {
-                    x: si.x + dist * divRef.refDir.x,
-                    y: si.y + dist * divRef.refDir.y,
-                };
-            }
-
-            const d = Segment.buildPathD(sp.points, this.curveIntensity, p0Override, p3Override);
-            svgParts.push(Segment.renderPathSvg(d, sharedStyle));
-        }
-
-        // Render unique (non-shared) sub-paths.
-        // Each path ending at a convergence junction or starting at a divergence
-        // junction receives a per-path p3Override / p0Override that forces its
-        // boundary tangent to match the junction's reference direction.
-        //
-        // The override must be scaled by the individual segment length because a
-        // single fixed target point produces different tangent directions for
-        // routes with different predecessor/successor distances.
-        for (const sp of uniqueSubPaths) {
-            const route = routes[sp.routeIndex];
             const style = route.style ?? this.segmentStyle;
 
-            let p0Override: { x: number; y: number } | undefined;
-            let p3Override: { x: number; y: number } | undefined;
+            // Build per-bezier-segment overrides at junction points,
+            // mirroring the editor's rebuildRoute logic.
+            const p0Overrides = new Map<number, { x: number; y: number }>();
+            const p3Overrides = new Map<number, { x: number; y: number }>();
 
-            if (sp.points.length >= 2) {
-                // Divergence: path starts at the end of a shared segment.
-                const divRef = divergenceRefs.get(sp.points[0]);
-                if (divRef) {
-                    const junction = sp.points[0];
-                    const pNext    = sp.points[1];
-                    const scale    = vecLen({ x: pNext.x - junction.x, y: pNext.y - junction.y });
-                    p0Override = {
-                        x: pNext.x - scale * divRef.refDir.x,
-                        y: pNext.y - scale * divRef.refDir.y,
-                    };
+            for (let k = 0; k < pts.length; k++) {
+                const pt = pts[k];
+
+                // Check if this point is a junction (has refs registered).
+                const convRef = convergenceRefs.get(pt);
+                const divRef  = divergenceRefs.get(pt);
+                if (!convRef && !divRef) continue;
+
+                // Determine this route's role at the junction by checking
+                // whether the edges before/after are shared or unique.
+                const beforeShared = k >= 1 && isShared(pts[k - 1], pts[k]);
+                const afterShared  = k < pts.length - 1 && isShared(pts[k], pts[k + 1]);
+
+                // Pick the appropriate ref for this route's role.
+                let ref: { x: number; y: number } | undefined;
+                if (!beforeShared && afterShared && convRef) {
+                    ref = convRef.refDir;
+                } else if (beforeShared && !afterShared && divRef) {
+                    ref = divRef.refDir;
                 }
+                if (!ref) continue;
 
-                // Convergence: path ends at the start of a shared segment.
-                const lastPt  = sp.points[sp.points.length - 1];
-                const convRef = convergenceRefs.get(lastPt);
-                if (convRef) {
-                    const pPrev = sp.points[sp.points.length - 2];
-                    const scale = vecLen({ x: lastPt.x - pPrev.x, y: lastPt.y - pPrev.y });
-                    p3Override = {
-                        x: pPrev.x + scale * convRef.refDir.x,
-                        y: pPrev.y + scale * convRef.refDir.y,
-                    };
+                if (k >= 1) {
+                    const pPrev = pts[k - 1];
+                    const scale = vecLen({ x: pt.x - pPrev.x, y: pt.y - pPrev.y });
+                    p3Overrides.set(k - 1, {
+                        x: pPrev.x + scale * ref.x,
+                        y: pPrev.y + scale * ref.y,
+                    });
+                }
+                if (k < pts.length - 1) {
+                    const pNext = pts[k + 1];
+                    const scale = vecLen({ x: pNext.x - pt.x, y: pNext.y - pt.y });
+                    p0Overrides.set(k, {
+                        x: pNext.x - scale * ref.x,
+                        y: pNext.y - scale * ref.y,
+                    });
                 }
             }
 
-            const d = Segment.buildPathD(sp.points, this.curveIntensity, p0Override, p3Override);
+            // Build the full-route path with per-bezier overrides.
+            const intensity = Math.max(0, this.curveIntensity);
+            let d = `M ${pts[0].x} ${pts[0].y}`;
+            for (let i = 0; i < pts.length - 1; i++) {
+                const p0 = p0Overrides.get(i) ?? (i === 0 ? pts[i] : pts[i - 1]);
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const p3 = p3Overrides.get(i) ?? (i === pts.length - 2 ? pts[i + 1] : pts[i + 2]);
+
+                const factor = intensity / 6;
+                const c1x = p1.x + (p2.x - p0.x) * factor;
+                const c1y = p1.y + (p2.y - p0.y) * factor;
+                const c2x = p2.x - (p3.x - p1.x) * factor;
+                const c2y = p2.y - (p3.y - p1.y) * factor;
+
+                d += ` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2.x} ${p2.y}`;
+            }
+
             svgParts.push(Segment.renderPathSvg(d, style));
         }
 
