@@ -154,6 +154,12 @@ const case9Route4 = new route_1.Route("Route 4", [
     trunkBottom, trunkMid, trunkUpper, trunkTop,
     new point_1.Point(105, 25, point_1.PointType.ANCHOR),
 ], { strokeColor: "#ffaa00" });
+/** Case 10: Point styling — same zig-zag with different point styles. */
+const pointStyleLarge = { radius: 6, strokeWidth: 2 };
+const pointStyleCustom = { radius: 5, fillColor: '#ff69b4', strokeColor: '#ffffff', strokeWidth: 1.5 };
+const case10RouteDefault = new route_1.Route("Default Points", case3PointsZigZag);
+const case10RouteLarge = new route_1.Route("Large Points", case3PointsZigZag, undefined, pointStyleLarge);
+const case10RouteCustom = new route_1.Route("Custom Points", case3PointsZigZag, undefined, pointStyleCustom);
 const testCases = [
     {
         id: "case1",
@@ -211,6 +217,16 @@ const testCases = [
         title: "Case 9: Complex 4-route asymmetric merge",
         description: "Four routes converge into a shared trunk. Route 1 (red) exits early left. Routes 2 (green) & 3 (blue) share more trunk. Route 4 (orange) rides the full trunk.",
         variants: [{ label: "", routes: [case9Route1, case9Route2, case9Route3, case9Route4] }],
+    },
+    {
+        id: "case10",
+        title: "Case 10: Point styling",
+        description: "Same zig-zag route with different point visual styles.",
+        variants: [
+            { label: "Default", routes: [case10RouteDefault] },
+            { label: "Large (r=6, stroke=2)", routes: [case10RouteLarge] },
+            { label: "Custom (pink, white stroke)", routes: [case10RouteCustom] },
+        ],
     },
 ];
 /**
@@ -336,7 +352,7 @@ function num(n) {
  * - Creates a TopoRender + TopoEditor and mounts into a container.
  * - Registers the editor for the intensity slider.
  */
-function serializeVariantSetup(routes, containerId, width, height, segmentStyle) {
+function serializeVariantSetup(routes, containerId, width, height, segmentStyle, pointStyle) {
     var _a;
     // Detect points used more than once across all routes (by reference).
     const pointCount = new Map();
@@ -370,14 +386,19 @@ function serializeVariantSetup(routes, containerId, width, height, segmentStyle)
             return `new Point(${num(p.x)}, ${num(p.y)}, PointType.${pointTypeKey(p.type)})`;
         })
             .join(", ");
-        const styleStr = route.style ? `, ${JSON.stringify(route.style)}` : "";
-        js += `      new Route("${route.name}", [${ptsStr}]${styleStr}),\n`;
+        // Build the optional 3rd (segmentStyle) and 4th (pointStyle) args.
+        const segStr = route.style ? JSON.stringify(route.style) : (route.pointStyle ? "undefined" : "");
+        const ptStr = route.pointStyle ? `, ${JSON.stringify(route.pointStyle)}` : "";
+        const argsStr = segStr || ptStr ? `, ${segStr}${ptStr}` : "";
+        js += `      new Route("${route.name}", [${ptsStr}]${argsStr}),\n`;
     }
     js += "    ];\n\n";
     // Renderer + editor setup.
     const rendererOpts = { width, height, curveIntensity: 1 };
     if (segmentStyle)
         rendererOpts.segmentStyle = segmentStyle;
+    if (pointStyle)
+        rendererOpts.pointStyle = pointStyle;
     const editorOpts = JSON.stringify({ width, height, curveIntensity: 1 });
     js += `    var renderer = new TopoRender(${JSON.stringify(rendererOpts)});\n`;
     js += `    var editor = new TopoEditor(renderer, ${editorOpts});\n`;
@@ -425,7 +446,7 @@ function buildCaseScript(tc) {
         const cid = tc.variants.length > 1
             ? `${tc.id}-${slugify(v.label)}`
             : tc.id;
-        script += serializeVariantSetup(v.routes, cid, 200, 200, v.segmentStyle);
+        script += serializeVariantSetup(v.routes, cid, 200, 200, v.segmentStyle, v.pointStyle);
     }
     return script;
 }

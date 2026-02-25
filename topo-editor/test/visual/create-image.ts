@@ -8,7 +8,7 @@
 // Run:  npm run visual   (builds + generates index.html)
 // View: open index.html via http-server
 
-import { Point, PointType } from "../../../topo-render/src/model/point";
+import { Point, PointType, PointStyle } from "../../../topo-render/src/model/point";
 import { Route } from "../../../topo-render/src/model/route";
 import { SegmentStyle } from "../../../topo-render/src/model/segment";
 import { buildRenderCasesHtml } from "../../../topo-render/test/visual/create-image";
@@ -171,6 +171,13 @@ const case9Route4 = new Route("Route 4", [
     new Point(105, 25, PointType.ANCHOR),
 ], { strokeColor: "#ffaa00" });
 
+/** Case 10: Point styling — same zig-zag with different point styles. */
+const pointStyleLarge: PointStyle = { radius: 6, strokeWidth: 2 };
+const pointStyleCustom: PointStyle = { radius: 5, fillColor: '#ff69b4', strokeColor: '#ffffff', strokeWidth: 1.5 };
+const case10RouteDefault = new Route("Default Points", case3PointsZigZag);
+const case10RouteLarge = new Route("Large Points", case3PointsZigZag, undefined, pointStyleLarge);
+const case10RouteCustom = new Route("Custom Points", case3PointsZigZag, undefined, pointStyleCustom);
+
 // ---------------------------------------------------------------------------
 // Test case definitions
 // ---------------------------------------------------------------------------
@@ -179,6 +186,7 @@ interface CaseVariant {
     label: string;
     routes: Route[];
     segmentStyle?: SegmentStyle;
+    pointStyle?: PointStyle;
 }
 
 interface TestCase {
@@ -245,6 +253,16 @@ const testCases: TestCase[] = [
         title: "Case 9: Complex 4-route asymmetric merge",
         description: "Four routes converge into a shared trunk. Route 1 (red) exits early left. Routes 2 (green) & 3 (blue) share more trunk. Route 4 (orange) rides the full trunk.",
         variants: [{ label: "", routes: [case9Route1, case9Route2, case9Route3, case9Route4] }],
+    },
+    {
+        id: "case10",
+        title: "Case 10: Point styling",
+        description: "Same zig-zag route with different point visual styles.",
+        variants: [
+            { label: "Default", routes: [case10RouteDefault] },
+            { label: "Large (r=6, stroke=2)", routes: [case10RouteLarge] },
+            { label: "Custom (pink, white stroke)", routes: [case10RouteCustom] },
+        ],
     },
 ];
 
@@ -405,7 +423,8 @@ function serializeVariantSetup(
     containerId: string,
     width: number,
     height: number,
-    segmentStyle?: SegmentStyle
+    segmentStyle?: SegmentStyle,
+    pointStyle?: PointStyle
 ): string {
     // Detect points used more than once across all routes (by reference).
     const pointCount = new Map<Point<PointType>, number>();
@@ -441,14 +460,18 @@ function serializeVariantSetup(
             })
             .join(", ");
 
-        const styleStr = route.style ? `, ${JSON.stringify(route.style)}` : "";
-        js += `      new Route("${route.name}", [${ptsStr}]${styleStr}),\n`;
+        // Build the optional 3rd (segmentStyle) and 4th (pointStyle) args.
+        const segStr = route.style ? JSON.stringify(route.style) : (route.pointStyle ? "undefined" : "");
+        const ptStr  = route.pointStyle ? `, ${JSON.stringify(route.pointStyle)}` : "";
+        const argsStr = segStr || ptStr ? `, ${segStr}${ptStr}` : "";
+        js += `      new Route("${route.name}", [${ptsStr}]${argsStr}),\n`;
     }
     js += "    ];\n\n";
 
     // Renderer + editor setup.
     const rendererOpts: Record<string, unknown> = { width, height, curveIntensity: 1 };
     if (segmentStyle) rendererOpts.segmentStyle = segmentStyle;
+    if (pointStyle) rendererOpts.pointStyle = pointStyle;
     const editorOpts = JSON.stringify({ width, height, curveIntensity: 1 });
 
     js += `    var renderer = new TopoRender(${JSON.stringify(rendererOpts)});\n`;
@@ -502,7 +525,7 @@ function buildCaseScript(tc: TestCase): string {
         const cid = tc.variants.length > 1
             ? `${tc.id}-${slugify(v.label)}`
             : tc.id;
-        script += serializeVariantSetup(v.routes, cid, 200, 200, v.segmentStyle);
+        script += serializeVariantSetup(v.routes, cid, 200, 200, v.segmentStyle, v.pointStyle);
     }
     return script;
 }

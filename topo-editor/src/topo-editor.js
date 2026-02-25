@@ -89,6 +89,33 @@ class TopoEditor {
          * child elements.
          */
         this.hoveredElement = null;
+        // -----------------------------------------------------------------------
+        // Junction reference directions (shared-segment tangent continuity)
+        // -----------------------------------------------------------------------
+        /**
+         * For each convergence junction (start of a shared segment), the unit
+         * reference direction all arriving paths must use at that junction.
+         * Keyed by {@link EditorPoint.id}.
+         */
+        this.convergenceRefs = new Map();
+        /**
+         * For each divergence junction (end of a shared segment), the unit
+         * reference direction all departing paths must use at that junction.
+         * Keyed by {@link EditorPoint.id}.
+         */
+        this.divergenceRefs = new Map();
+        /**
+         * IDs of all points that sit at the boundary of a shared segment.
+         * Recomputing junction refs only when a junction point moves keeps
+         * performance reasonable during drag operations.
+         */
+        this.junctionPoints = new Set();
+        /**
+         * Canonical edge keys for edges traversed by more than one route.
+         * Used by {@link rebuildRoute} to determine whether a given point
+         * is a convergence or divergence junction for a specific route.
+         */
+        this.sharedEdgeKeys = new Set();
         this.renderer = renderer;
         this.width = (_a = options === null || options === void 0 ? void 0 : options.width) !== null && _a !== void 0 ? _a : 200;
         this.height = (_b = options === null || options === void 0 ? void 0 : options.height) !== null && _b !== void 0 ? _b : 200;
@@ -144,11 +171,16 @@ class TopoEditor {
         this.extractRouteData(routes);
         // 3. Collect circle element references from the rendered SVG.
         this.collectCircleElements();
-        // 4. Replace TopoRender paths with per-route paths.
+        // 4. Compute junction reference directions before creating path elements
+        //    so that rebuildRoute (called in step 5) has valid refs to apply.
+        this.computeJunctionRefs();
+        // 5. Replace TopoRender paths with per-route paths.
         this.replacePathsWithPerRoute();
-        // 5. Build the point → route reverse index.
+        // 6. Build the point → route reverse index.
         this.buildPointToRouteIndex();
-        // 6. Attach drag event listeners to the SVG.
+        // 7. Re-apply junction overrides now that all path DOM elements exist.
+        this.rebuildAllRoutes();
+        // 8. Attach drag event listeners to the SVG.
         this.bindEvents();
     }
     /**
@@ -241,6 +273,10 @@ class TopoEditor {
         this.hoveredElement = null;
         this.container = null;
         this.svg = null;
+        this.convergenceRefs.clear();
+        this.divergenceRefs.clear();
+        this.junctionPoints.clear();
+        this.sharedEdgeKeys.clear();
     }
     // -----------------------------------------------------------------------
     // Data extraction
@@ -408,9 +444,7 @@ class TopoEditor {
      *
      * ### Algorithm
      *
-     * For each segment between consecutive points `p1` and `p2`, we
-     * compute two cubic Bézier control points using the surrounding
-     * points `p0` (predecessor) and `p3` (successor):
+     * For each bezier segment `i` (from `pts[i]` to `pts[i+1]`):
      *
      * ```
      * factor = intensity / 6
@@ -418,23 +452,33 @@ class TopoEditor {
      * C2 = p2 − (p3 − p1) × factor
      * ```
      *
-     * At the path boundaries, `p0` and `p3` are clamped to the
-     * endpoint itself, producing a natural deceleration into the
-     * first/last point.
+     * `p0` is `pts[i-1]` for interior segments, or `pts[i]` when clamped at
+     * the start (overridable via `p0Overrides`).  `p3` is `pts[i+2]` for
+     * interior segments, or `pts[i+1]` when clamped at the end (overridable
+     * via `p3Overrides`).
      *
-     * @param pts - Ordered array of points with `x` and `y` properties.
+     * The optional override maps allow junction tangent constraints to be
+     * injected at any bezier segment without splitting the full-route path.
+     * Keys are bezier-segment indices (0 … pts.length − 2).
+     *
+     * @param pts         - Ordered array of points with `x` and `y` properties.
+     * @param p0Overrides - Optional per-bezier-segment p0 replacements.
+     * @param p3Overrides - Optional per-bezier-segment p3 replacements.
      * @returns The SVG path `d` string, or `""` if fewer than 2 points.
      */
-    buildPathD(pts) {
+    buildPathD(pts, p0Overrides, p3Overrides) {
+        var _a, _b;
         if (pts.length < 2)
             return "";
         const intensity = Math.max(0, this.curveIntensity);
         let d = `M ${pts[0].x} ${pts[0].y}`;
         for (let i = 0; i < pts.length - 1; i++) {
-            const p0 = i === 0 ? pts[i] : pts[i - 1];
+            // Use an explicit override if provided, otherwise use the natural
+            // Catmull-Rom neighbour (or clamped endpoint at path boundaries).
+            const p0 = (_a = p0Overrides === null || p0Overrides === void 0 ? void 0 : p0Overrides.get(i)) !== null && _a !== void 0 ? _a : (i === 0 ? pts[i] : pts[i - 1]);
             const p1 = pts[i];
             const p2 = pts[i + 1];
-            const p3 = i === pts.length - 2 ? pts[i + 1] : pts[i + 2];
+            const p3 = (_b = p3Overrides === null || p3Overrides === void 0 ? void 0 : p3Overrides.get(i)) !== null && _b !== void 0 ? _b : (i === pts.length - 2 ? pts[i + 1] : pts[i + 2]);
             const factor = intensity / 6;
             const c1x = p1.x + (p2.x - p0.x) * factor;
             const c1y = p1.y + (p2.y - p0.y) * factor;
@@ -472,13 +516,80 @@ class TopoEditor {
      * Rebuild a single route's SVG path `d` attribute from the current
      * (possibly dragged) point positions.
      *
+     * For each point in the route that is a convergence or divergence junction,
+     * per-bezier-segment p0/p3 overrides are injected so that the curve
+     * arrives and departs at the junction's reference direction. This ensures
+     * that all routes through a shared segment produce the same visual path.
+     *
      * @param routeIndex - Index into {@link routes} and
      *   {@link routePathElements}.
      */
     rebuildRoute(routeIndex) {
         const r = this.routes[routeIndex];
-        const pts = r.pointIds.map((id) => this.points.get(id));
-        const d = this.buildPathD(pts);
+        const ids = r.pointIds;
+        const pts = ids.map((id) => this.points.get(id));
+        // Build per-bezier-segment overrides from the junction reference maps.
+        const p0Ov = new Map();
+        const p3Ov = new Map();
+        for (let k = 0; k < ids.length; k++) {
+            const pid = ids[k];
+            if (!this.junctionPoints.has(pid))
+                continue;
+            const pt = pts[k];
+            // Determine this route's role at the junction by checking whether
+            // the edges before and after this point are shared or unique.
+            const beforeShared = k >= 1
+                && this.sharedEdgeKeys.has(this.edgeKey(ids[k - 1], ids[k]));
+            const afterShared = k < ids.length - 1
+                && this.sharedEdgeKeys.has(this.edgeKey(ids[k], ids[k + 1]));
+            // Convergence: unique segment before → shared segment after.
+            // Use convRef (points INTO the shared segment).
+            if (!beforeShared && afterShared) {
+                const ref = this.convergenceRefs.get(pid);
+                if (ref) {
+                    if (k >= 1) {
+                        const pPrev = pts[k - 1];
+                        const scale = editorVecLen(pt.x - pPrev.x, pt.y - pPrev.y);
+                        p3Ov.set(k - 1, {
+                            x: pPrev.x + scale * ref.x,
+                            y: pPrev.y + scale * ref.y,
+                        });
+                    }
+                    if (k < ids.length - 1) {
+                        const pNext = pts[k + 1];
+                        const scale = editorVecLen(pNext.x - pt.x, pNext.y - pt.y);
+                        p0Ov.set(k, {
+                            x: pNext.x - scale * ref.x,
+                            y: pNext.y - scale * ref.y,
+                        });
+                    }
+                }
+            }
+            // Divergence: shared segment before → unique segment after.
+            // Use divRef (points AWAY from the shared segment = −convRef).
+            if (beforeShared && !afterShared) {
+                const ref = this.divergenceRefs.get(pid);
+                if (ref) {
+                    if (k >= 1) {
+                        const pPrev = pts[k - 1];
+                        const scale = editorVecLen(pt.x - pPrev.x, pt.y - pPrev.y);
+                        p3Ov.set(k - 1, {
+                            x: pPrev.x + scale * ref.x,
+                            y: pPrev.y + scale * ref.y,
+                        });
+                    }
+                    if (k < ids.length - 1) {
+                        const pNext = pts[k + 1];
+                        const scale = editorVecLen(pNext.x - pt.x, pNext.y - pt.y);
+                        p0Ov.set(k, {
+                            x: pNext.x - scale * ref.x,
+                            y: pNext.y - scale * ref.y,
+                        });
+                    }
+                }
+            }
+        }
+        const d = this.buildPathD(pts, p0Ov, p3Ov);
         const els = this.routePathElements[routeIndex];
         if (els.main)
             els.main.setAttribute("d", d);
@@ -492,6 +603,177 @@ class TopoEditor {
     rebuildAllRoutes() {
         for (let i = 0; i < this.routes.length; i++) {
             this.rebuildRoute(i);
+        }
+    }
+    // -----------------------------------------------------------------------
+    // Junction reference direction computation
+    // -----------------------------------------------------------------------
+    /**
+     * Canonical bidirectional edge key.
+     * Returns the same string for edge (a, b) and edge (b, a) so that
+     * shared-edge detection is direction-agnostic.
+     */
+    edgeKey(a, b) {
+        return a < b ? `${a}:${b}` : `${b}:${a}`;
+    }
+    /**
+     * Compute the reference direction at every junction point (boundary
+     * between a unique and a shared sub-path) and store the results in
+     * {@link convergenceRefs}, {@link divergenceRefs}, and
+     * {@link junctionPoints}.
+     *
+     * The algorithm mirrors the one in `TopoRender.render`:
+     *
+     * 1. Build a canonical (bidirectional) edge-count map.
+     * 2. Split each route into shared/unique sub-paths.
+     * 3. For each junction, find the unique path whose natural direction
+     *    makes the smallest angle with the shared segment's axis (largest
+     *    dot product). That direction becomes the reference for all paths
+     *    at that junction, including the shared segment's own tangent.
+     *
+     * Called once at mount time and again whenever a point is dragged
+     * (moving any point may change the minimum-angle selection).
+     */
+    computeJunctionRefs() {
+        var _a, _b, _c;
+        this.convergenceRefs.clear();
+        this.divergenceRefs.clear();
+        this.junctionPoints.clear();
+        this.sharedEdgeKeys.clear();
+        if (this.routes.length === 0)
+            return;
+        // --- Step 1: bidirectional edge counts ---
+        const edgeCount = new Map();
+        for (const route of this.routes) {
+            const ids = route.pointIds;
+            for (let i = 0; i < ids.length - 1; i++) {
+                const key = this.edgeKey(ids[i], ids[i + 1]);
+                edgeCount.set(key, ((_a = edgeCount.get(key)) !== null && _a !== void 0 ? _a : 0) + 1);
+            }
+        }
+        const isSharedEdge = (a, b) => { var _a; return ((_a = edgeCount.get(this.edgeKey(a, b))) !== null && _a !== void 0 ? _a : 0) > 1; };
+        // Store shared edge keys so rebuildRoute can determine convergence
+        // vs divergence role at each junction point.
+        for (const [key, count] of edgeCount) {
+            if (count > 1)
+                this.sharedEdgeKeys.add(key);
+        }
+        const allRouteSubs = [];
+        for (const route of this.routes) {
+            const ids = route.pointIds;
+            const subs = [];
+            if (ids.length < 2) {
+                allRouteSubs.push(subs);
+                continue;
+            }
+            let startIdx = 0;
+            let currentShared = isSharedEdge(ids[0], ids[1]);
+            for (let i = 0; i < ids.length - 1; i++) {
+                const seg = isSharedEdge(ids[i], ids[i + 1]);
+                if (seg !== currentShared) {
+                    subs.push({ ids: ids.slice(startIdx, i + 1), shared: currentShared });
+                    startIdx = i;
+                    currentShared = seg;
+                }
+            }
+            subs.push({ ids: ids.slice(startIdx), shared: currentShared });
+            allRouteSubs.push(subs);
+        }
+        // --- Step 3a: collect junction points and unique sub-paths ---
+        // Register both endpoints of each shared sub-path as junction points.
+        const junctionInterior = new Map();
+        const seenShared = new Set();
+        for (const subs of allRouteSubs) {
+            for (const sub of subs) {
+                if (!sub.shared || sub.ids.length < 2)
+                    continue;
+                // Direction-normalised dedup key.
+                const fwd = sub.ids.join(',');
+                const rev = [...sub.ids].reverse().join(',');
+                const key = fwd <= rev ? fwd : rev;
+                if (seenShared.has(key))
+                    continue;
+                seenShared.add(key);
+                const firstId = sub.ids[0];
+                const lastId = sub.ids[sub.ids.length - 1];
+                this.junctionPoints.add(firstId);
+                this.junctionPoints.add(lastId);
+                // Store interior neighbor for each endpoint (first-wins guard
+                // handles the rare case where a point borders two shared segments).
+                if (!junctionInterior.has(firstId)) {
+                    const ip = this.points.get(sub.ids[1]);
+                    junctionInterior.set(firstId, { x: ip.x, y: ip.y });
+                }
+                if (!junctionInterior.has(lastId)) {
+                    const ip = this.points.get(sub.ids[sub.ids.length - 2]);
+                    junctionInterior.set(lastId, { x: ip.x, y: ip.y });
+                }
+            }
+        }
+        const uniqueEndingAt = new Map();
+        const uniqueStartingAt = new Map();
+        for (const subs of allRouteSubs) {
+            for (const sub of subs) {
+                if (sub.shared || sub.ids.length < 2)
+                    continue;
+                const firstId = sub.ids[0];
+                const lastId = sub.ids[sub.ids.length - 1];
+                const pts = sub.ids.map(id => {
+                    const p = this.points.get(id);
+                    return { x: p.x, y: p.y };
+                });
+                if (junctionInterior.has(lastId)) {
+                    if (!uniqueEndingAt.has(lastId))
+                        uniqueEndingAt.set(lastId, []);
+                    uniqueEndingAt.get(lastId).push(pts);
+                }
+                if (junctionInterior.has(firstId)) {
+                    if (!uniqueStartingAt.has(firstId))
+                        uniqueStartingAt.set(firstId, []);
+                    uniqueStartingAt.get(firstId).push(pts);
+                }
+            }
+        }
+        // --- Step 3b: compute junction reference directions ---
+        // At each junction, average the "approach" directions of ALL unique
+        // paths — both arrivals and departures (negated so they all point
+        // toward the shared interior). The convergence ref = this average;
+        // the divergence ref = its negation. This ensures opposite-direction
+        // routes produce reversal-compatible Bézier curves.
+        for (const [junctionId, interior] of junctionInterior) {
+            const jPt = this.points.get(junctionId);
+            const sharedAxis = editorVecNorm(interior.x - jPt.x, interior.y - jPt.y);
+            let sumX = 0, sumY = 0;
+            let count = 0;
+            // Unique paths arriving at this junction.
+            for (const pts of ((_b = uniqueEndingAt.get(junctionId)) !== null && _b !== void 0 ? _b : [])) {
+                const pPrev = pts[pts.length - 2];
+                const nat = editorVecNorm(jPt.x - pPrev.x, jPt.y - pPrev.y);
+                sumX += nat.x;
+                sumY += nat.y;
+                count++;
+            }
+            // Unique paths departing from this junction (negated to point
+            // toward the shared interior).
+            for (const pts of ((_c = uniqueStartingAt.get(junctionId)) !== null && _c !== void 0 ? _c : [])) {
+                const pNext = pts[1];
+                const nat = editorVecNorm(jPt.x - pNext.x, jPt.y - pNext.y);
+                sumX += nat.x;
+                sumY += nat.y;
+                count++;
+            }
+            let refDir = sharedAxis;
+            if (count > 0) {
+                const avg = editorVecNorm(sumX, sumY);
+                if (avg.x !== 0 || avg.y !== 0) {
+                    refDir = avg;
+                }
+            }
+            this.convergenceRefs.set(junctionId, refDir);
+            this.divergenceRefs.set(junctionId, {
+                x: -refDir.x,
+                y: -refDir.y,
+            });
         }
     }
     // -----------------------------------------------------------------------
@@ -594,7 +876,7 @@ class TopoEditor {
      * @param evt - The mousemove event.
      */
     handleMouseMove(evt) {
-        var _a;
+        var _a, _b;
         if (this.dragPointId === null)
             return;
         const svgPt = this.getSVGPoint(evt);
@@ -610,9 +892,27 @@ class TopoEditor {
             circle.setAttribute("cx", String(newX));
             circle.setAttribute("cy", String(newY));
         }
-        // Rebuild every route that includes this point.
-        const affected = (_a = this.pointToRouteIndices.get(this.dragPointId)) !== null && _a !== void 0 ? _a : [];
-        for (const ri of affected) {
+        // Recompute junction reference directions: moving any point may change
+        // the minimum-angle selection at adjacent junctions. This is inexpensive
+        // for typical topo diagrams (< 20 routes, < 50 points).
+        this.computeJunctionRefs();
+        // Rebuild every route that includes this point, plus any route that
+        // shares a junction point with those routes. Without this expansion,
+        // dragging a point on a unique segment adjacent to a shared segment
+        // would only rebuild the dragged route — leaving sibling routes with
+        // stale path data through the shared section ("demerging").
+        const directlyAffected = (_a = this.pointToRouteIndices.get(this.dragPointId)) !== null && _a !== void 0 ? _a : [];
+        const toRebuild = new Set(directlyAffected);
+        for (const ri of directlyAffected) {
+            for (const pid of this.routes[ri].pointIds) {
+                if (this.junctionPoints.has(pid)) {
+                    for (const siblingRi of ((_b = this.pointToRouteIndices.get(pid)) !== null && _b !== void 0 ? _b : [])) {
+                        toRebuild.add(siblingRi);
+                    }
+                }
+            }
+        }
+        for (const ri of toRebuild) {
             this.rebuildRoute(ri);
         }
         evt.preventDefault();
@@ -828,3 +1128,21 @@ exports.TopoEditor = TopoEditor;
  * TopoEditor instance. Shared across all instances.
  */
 TopoEditor.globalEmitter = new topo_event_emitter_1.TopoEventEmitter();
+// ---------------------------------------------------------------------------
+// Module-level vector helpers (used by TopoEditor internals)
+// ---------------------------------------------------------------------------
+/**
+ * Return the unit vector of (dx, dy), or {0, 0} for a near-zero input.
+ * Named with an "editor" prefix to avoid collision with identically-named
+ * helpers in topo-tool.ts should the two modules ever be bundled together.
+ */
+function editorVecNorm(dx, dy) {
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1e-10)
+        return { x: 0, y: 0 };
+    return { x: dx / len, y: dy / len };
+}
+/** Euclidean length of the vector (dx, dy). */
+function editorVecLen(dx, dy) {
+    return Math.sqrt(dx * dx + dy * dy);
+}

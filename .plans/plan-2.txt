@@ -1,0 +1,18 @@
+Plan: Add configurable PointStyle to topo-render and topo-editor
+
+Summary:
+  Added a PointStyle interface and cascade system mirroring the existing
+  SegmentStyle pattern. Points can now be styled at two levels:
+  - Global: pointStyle on TopoRenderOptions / TopoEditorOptions
+  - Per-route: pointStyle on Route (4th constructor arg)
+  Per-route overrides merge on top of global defaults. Type-based fill
+  colours remain as the final fallback when no fillColor is specified.
+
+Files changed:
+  1. topo-render/src/model/point/point.ts — PointStyle interface,
+     DEFAULT_POINT_STYLE, DEFAULT_POINT_FILLS, updated render()
+  2. topo-render/src/model/point/index.ts — re-exports
+  3. topo-render/src/model/route.ts — added pointStyle to Route
+  4. topo-render/src/topo-tool.ts — pointStyle on options, cascade in render
+  5. topo-editor/src/topo-editor.ts — pointStyle on TopoEditorOptions
+  6. topo-editor/test/visual/create-image.ts — Case 10 point styling demo
