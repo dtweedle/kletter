@@ -1,4 +1,4 @@
-import { Point, PointType } from "./model/point";
+import { Point, PointType, PointStyle } from "./model/point";
 import { Segment, SegmentStyle } from "./model/segment";
 import { Route } from "./model/route";
 
@@ -34,6 +34,12 @@ export interface TopoRenderOptions {
      * overridden per-route.
      */
     segmentStyle?: SegmentStyle;
+
+    /**
+     * Default point style applied to all points unless overridden
+     * per-route via {@link Route.pointStyle}.
+     */
+    pointStyle?: PointStyle;
 }
 
 /**
@@ -45,12 +51,14 @@ export class TopoRender {
     private height: number;
     private curveIntensity: number;
     private segmentStyle?: SegmentStyle;
+    private pointStyle?: PointStyle;
 
     constructor(options: TopoRenderOptions = {}) {
         this.width = options.width ?? 200;
         this.height = options.height ?? 200;
         this.curveIntensity = options.curveIntensity ?? 1;
         this.segmentStyle = options.segmentStyle;
+        this.pointStyle = options.pointStyle;
     }
 
     /**
@@ -395,13 +403,21 @@ export class TopoRender {
         }
 
         // Render all points on top of the paths (deduplicated by reference).
+        // Point style cascade: route.pointStyle → this.pointStyle → type defaults.
+        // Note: shared points (same reference across routes) are rendered once;
+        // the first route that encounters the point determines its style.
         const renderedPoints = new Set<Point<PointType>>();
         let pointIdCounter = 0;
         for (const route of routes) {
+            // Merge per-route overrides on top of global defaults.
+            const effectivePointStyle: PointStyle | undefined = route.pointStyle
+                ? { ...this.pointStyle, ...route.pointStyle }
+                : this.pointStyle;
+
             for (const p of route.points) {
                 if (!renderedPoints.has(p)) {
                     renderedPoints.add(p);
-                    svgParts.push(p.render(pointIdCounter++));
+                    svgParts.push(p.render(pointIdCounter++, effectivePointStyle));
                 }
             }
         }

@@ -1,6 +1,47 @@
 import { PointType } from "./constants";
 
-/** 
+/**
+ * Visual style overrides for point rendering.
+ *
+ * All fields are optional. When a field is omitted, the built-in default
+ * is used. For `fillColor`, the default depends on the point's
+ * {@link PointType} — see {@link DEFAULT_POINT_FILLS}.
+ */
+export interface PointStyle {
+    /** Circle radius in pixels. @defaultValue 4 */
+    radius?: number;
+    /** Fill colour (CSS). Overrides the per-type default when set. */
+    fillColor?: string;
+    /** Stroke (outline) colour (CSS). @defaultValue '#000000' */
+    strokeColor?: string;
+    /** Stroke width in pixels. @defaultValue 1 */
+    strokeWidth?: number;
+}
+
+/**
+ * Default values for all type-independent point style properties.
+ * `fillColor` is intentionally absent — it falls back to the
+ * per-{@link PointType} colour in {@link DEFAULT_POINT_FILLS}.
+ */
+export const DEFAULT_POINT_STYLE: Required<Omit<PointStyle, 'fillColor'>> = {
+    radius: 4,
+    strokeColor: '#000000',
+    strokeWidth: 1,
+};
+
+/**
+ * Default fill colour per {@link PointType}.
+ * Used as the fallback when no `fillColor` is specified in a
+ * {@link PointStyle}.
+ */
+export const DEFAULT_POINT_FILLS: Record<PointType, string> = {
+    [PointType.ANCHOR]: '#ffd54f',
+    [PointType.BOLT]: '#42a5f5',
+    [PointType.FEATURE]: '#66bb6a',
+    [PointType.GENERIC]: '#ffffff',
+};
+
+/**
  * Represents a point in a 2D space with x and y coordinates given in pixels
  * that have been normalized to the svg canvas that are being rendered too.
  */
@@ -15,34 +56,23 @@ export class Point<PointT extends PointType> {
     constructor(public x: number, public y: number, public type: PointT) {}
 
     /**
-     * Render this point as an SVG element string.
+     * Render this point as an SVG circle element string.
      *
-     * For now we render each point as a small circle, with the fill colour
-     * indicating the point type. The coordinates are assumed to already be
-     * in the SVG canvas coordinate space.
+     * Style resolution follows a cascade:
+     *   1. Explicit `style` parameter fields (highest priority)
+     *   2. {@link DEFAULT_POINT_STYLE} for radius, strokeColor, strokeWidth
+     *   3. {@link DEFAULT_POINT_FILLS} for fillColor (type-based fallback)
+     *
+     * @param pointId - Optional numeric identifier written as `data-point-id`.
+     * @param style   - Optional style overrides.
      */
-    public render(pointId?: number): string {
-        const radius = 4;
-
-        let fill = "#ffffff";
-        const stroke = "#000000";
-
-        switch (this.type) {
-            case PointType.ANCHOR:
-                fill = "#ffd54f";
-                break;
-            case PointType.BOLT:
-                fill = "#42a5f5";
-                break;
-            case PointType.FEATURE:
-                fill = "#66bb6a";
-                break;
-            case PointType.GENERIC:
-            default:
-                fill = "#ffffff";
-        }
+    public render(pointId?: number, style?: PointStyle): string {
+        const radius      = style?.radius      ?? DEFAULT_POINT_STYLE.radius;
+        const strokeColor = style?.strokeColor  ?? DEFAULT_POINT_STYLE.strokeColor;
+        const strokeWidth = style?.strokeWidth  ?? DEFAULT_POINT_STYLE.strokeWidth;
+        const fill        = style?.fillColor    ?? DEFAULT_POINT_FILLS[this.type] ?? '#ffffff';
 
         const idAttr = pointId !== undefined ? ` data-point-id="${pointId}"` : "";
-        return `<circle class="topo-point"${idAttr} cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${stroke}" data-point-type="${this.type}" />`;
+        return `<circle class="topo-point"${idAttr} cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${strokeColor}" stroke-width="${strokeWidth}" data-point-type="${this.type}" />`;
     }
 }
