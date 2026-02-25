@@ -16,6 +16,8 @@ export interface PointStyle {
     strokeColor?: string;
     /** Stroke width in pixels. @defaultValue 1 */
     strokeWidth?: number;
+    /** Overall opacity applied to the circle (fill and stroke together). Range 0–1. @defaultValue 1 */
+    opacity?: number;
 }
 
 /**
@@ -27,6 +29,7 @@ export const DEFAULT_POINT_STYLE: Required<Omit<PointStyle, 'fillColor'>> = {
     radius: 4,
     strokeColor: '#000000',
     strokeWidth: 1,
+    opacity: 1,
 };
 
 /**
@@ -60,7 +63,7 @@ export class Point<PointT extends PointType> {
      *
      * Style resolution follows a cascade:
      *   1. Explicit `style` parameter fields (highest priority)
-     *   2. {@link DEFAULT_POINT_STYLE} for radius, strokeColor, strokeWidth
+     *   2. {@link DEFAULT_POINT_STYLE} for radius, strokeColor, strokeWidth, opacity
      *   3. {@link DEFAULT_POINT_FILLS} for fillColor (type-based fallback)
      *
      * @param pointId - Optional numeric identifier written as `data-point-id`.
@@ -71,8 +74,10 @@ export class Point<PointT extends PointType> {
         const strokeColor = style?.strokeColor  ?? DEFAULT_POINT_STYLE.strokeColor;
         const strokeWidth = style?.strokeWidth  ?? DEFAULT_POINT_STYLE.strokeWidth;
         const fill        = style?.fillColor    ?? DEFAULT_POINT_FILLS[this.type] ?? '#ffffff';
+        // Clamp opacity to the valid SVG range [0, 1] to guard against out-of-range values
+        const opacity     = Math.min(1, Math.max(0, style?.opacity ?? DEFAULT_POINT_STYLE.opacity));
 
         const idAttr = pointId !== undefined ? ` data-point-id="${pointId}"` : "";
-        return `<circle class="topo-point"${idAttr} cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${strokeColor}" stroke-width="${strokeWidth}" data-point-type="${this.type}" />`;
+        return `<circle class="topo-point"${idAttr} cx="${this.x}" cy="${this.y}" r="${radius}" fill="${fill}" stroke="${strokeColor}" stroke-width="${strokeWidth}" opacity="${opacity}" data-point-type="${this.type}" />`;
     }
 }

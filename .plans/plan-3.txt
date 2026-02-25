@@ -1,0 +1,23 @@
+Plan: Add opacity to PointStyle
+Branch: feature/point-opacity
+Model: claude-sonnet-4-6
+Date: 2026-02-25
+
+## Overview
+Add an optional `opacity` field (0–1) to the `PointStyle` interface so callers can
+control the transparency of rendered points globally or per-route.
+
+## Files to modify
+
+### 1. topo-render/src/model/point/point.ts
+- Add `opacity?: number` to `PointStyle` interface (JSDoc: 0=transparent, 1=opaque, default 1)
+- Add `opacity: 1` to `DEFAULT_POINT_STYLE` constant
+- Resolve opacity in `Point.render()` and emit as SVG `opacity` attribute on the circle element
+
+### 2. README.md
+- Add `opacity` row to the `PointStyle` property table in the "Key classes" section
+
+## Verification
+- `npm run build` — must compile without errors
+- `npm run visual` — open index.html, confirm existing visuals unchanged (opacity defaults to 1)
+- Manual: set `opacity: 0.3` on a route's pointStyle and confirm faded circles appear

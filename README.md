@@ -30,6 +30,21 @@ The render engine. Takes structured route data and produces an SVG string. Use t
 
 **Shared segment detection:** When multiple routes share the same `Point` references, `TopoRender` automatically detects overlapping edges and renders them as a single, slightly thicker path. Unique sections keep their per-route style.
 
+**Point style cascade:** Point appearance is resolved in priority order:
+1. Per-route `pointStyle` (highest priority)
+2. Global `pointStyle` on `TopoRenderOptions`
+3. Per-type fill colour from `DEFAULT_POINT_FILLS` / `DEFAULT_POINT_STYLE` (fallback)
+
+The `PointStyle` interface accepts:
+
+| Property      | Type     | Default                          | Description                              |
+| ------------- | -------- | -------------------------------- | ---------------------------------------- |
+| `radius`      | `number` | `4`                              | Circle radius in pixels                  |
+| `fillColor`   | `string` | Per-type (see table above)       | Fill colour (CSS). Overrides type colour |
+| `strokeColor` | `string` | `'#000000'`                      | Outline colour (CSS)                     |
+| `strokeWidth` | `number` | `1`                              | Outline width in pixels                  |
+| `opacity`     | `number` | `1`                              | Circle opacity 0–1 (fill and stroke together) |
+
 ---
 
 ### `topo-editor` — Interactive browser editor
@@ -116,6 +131,55 @@ const svg = renderer.render([route]);
 
 // `svg` is a self-contained SVG string — embed it in HTML or write to a file
 ```
+
+### Customising point appearance
+
+`PointStyle` can be set globally on the renderer, per-route, or both. Per-route values are merged on top of the global defaults.
+
+**Global style** — applies to every point unless a route overrides it:
+
+```typescript
+const renderer = new TopoRender({
+  width: 200,
+  height: 200,
+  pointStyle: {
+    radius: 6,          // larger circles
+    strokeColor: "#ffffff",
+    strokeWidth: 1.5,
+  },
+});
+```
+
+**Per-route style** — overrides the global style for all points on that route:
+
+```typescript
+const route = new Route(
+  "East Face",
+  [
+    new Point(40, 180, PointType.BOLT),
+    new Point(100, 100, PointType.FEATURE),
+    new Point(160, 40, PointType.ANCHOR),
+  ],
+  { strokeColor: "#ff6666" },   // segment style (4th arg)
+  {                             // point style (5th arg)
+    radius: 5,
+    fillColor: "#ff6666",       // uniform fill overriding per-type colours
+    strokeColor: "#ffffff",
+  },
+);
+```
+
+**Overriding the fill for a single type** — supply `fillColor` only when you need to change one colour; all other properties keep their defaults:
+
+```typescript
+const renderer = new TopoRender({
+  width: 200,
+  height: 200,
+  pointStyle: { fillColor: "#ff0000" },  // all points become red by default
+});
+```
+
+---
 
 ### Multiple routes with shared points
 
