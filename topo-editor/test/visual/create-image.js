@@ -406,6 +406,10 @@ function serializeVariantSetup(routes, containerId, width, height, segmentStyle,
     js += `    editor.mount("#${containerId}", routes);\n`;
     js += `    window.__topoEditors = window.__topoEditors || [];\n`;
     js += `    window.__topoEditors.push(editor);\n`;
+    // Register route names keyed by editor instance so the event log can
+    // display meaningful route names instead of raw indices.
+    js += `    window.__topoMeta = window.__topoMeta || new WeakMap();\n`;
+    js += `    window.__topoMeta.set(editor, { caseId: "${containerId}", routeNames: ${JSON.stringify(routes.map(r => r.name))} });\n`;
     js += "  })();\n";
     return js;
 }
@@ -497,6 +501,48 @@ const CSS = `
       .topo-point { cursor: grab; }
       .topo-point:hover { r: 6; filter: brightness(1.3); }
       .topo-point.dragging { cursor: grabbing; r: 6; filter: brightness(1.5); }
+
+      /* ---- Event log overlay panel ---- */
+      #event-log-panel {
+        position: fixed; bottom: 16px; right: 16px; z-index: 200;
+        width: 380px;
+        background: rgba(15, 15, 20, 0.82);
+        backdrop-filter: blur(4px);
+        border: 1px solid #444; border-radius: 8px;
+        font-family: monospace; font-size: 12px; color: #ddd;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      }
+      #event-log-header {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 10px; border-bottom: 1px solid #333;
+        user-select: none;
+      }
+      #event-log-header span { flex: 1; font-weight: 600; color: #eee; }
+      #event-log-header button {
+        background: #2a2a2a; border: 1px solid #555; color: #bbb;
+        border-radius: 4px; padding: 1px 8px; cursor: pointer; font-size: 11px;
+      }
+      #event-log-header button:hover { background: #3a3a3a; }
+      #event-log-body { max-height: 260px; overflow-y: auto; }
+      #event-log-body.minimized { display: none; }
+      #event-log-list { list-style: none; margin: 0; padding: 4px 0; }
+      #event-log-list li {
+        padding: 3px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
+        line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      #event-log-list li:last-child { border-bottom: none; }
+      .elog-time { color: #555; margin-right: 6px; }
+      .elog-type {
+        display: inline-block; padding: 0 5px; border-radius: 3px;
+        font-size: 10px; font-weight: 700; margin-right: 6px; letter-spacing: 0.03em;
+      }
+      .elog-click       { background: #1a4a2e; color: #6ef0a0; }
+      .elog-hover-enter { background: #1a2a3a; color: #7ec8e3; }
+      .elog-hover-leave { background: #1e1e1e; color: #666; }
+      .elog-focus       { background: #2a2a10; color: #d4c87a; }
+      .elog-blur        { background: #2a1a10; color: #c8946a; }
+      .elog-case   { color: #666; font-size: 10px; margin-right: 4px; }
+      .elog-detail { color: #aaa; }
     </style>`;
 // ---------------------------------------------------------------------------
 // Assemble and write the HTML
@@ -555,6 +601,107 @@ ${editorCasesScript}
         // Update live editors
         (window.__topoEditors || []).forEach(function(e) { e.setIntensity(val); });
       });
+    </script>
+
+    <!-- Floating event log panel -->
+    <div id="event-log-panel">
+      <div id="event-log-header">
+        <span>&#9654; Event Log</span>
+        <button id="event-log-clear">Clear</button>
+        <button id="event-log-toggle">&#8722;</button>
+      </div>
+      <div id="event-log-body">
+        <ul id="event-log-list"></ul>
+      </div>
+    </div>
+
+    <script>
+      // Event log: wires TopoEditor.on() for all 5 event types across every
+      // mounted editor instance. Route names are looked up from __topoMeta
+      // (registered per-editor in the setup scripts above).
+      (function () {
+        var MAX_ENTRIES = 150;
+        var logBody   = document.getElementById("event-log-body");
+        var logList   = document.getElementById("event-log-list");
+        var toggleBtn = document.getElementById("event-log-toggle");
+        var clearBtn  = document.getElementById("event-log-clear");
+        var minimized = false;
+
+        // Minimize / restore the log body
+        toggleBtn.addEventListener("click", function () {
+          minimized = !minimized;
+          logBody.classList.toggle("minimized", minimized);
+          toggleBtn.innerHTML = minimized ? "&#9650;" : "&#8722;";
+        });
+
+        // Clear all log entries
+        clearBtn.addEventListener("click", function () {
+          logList.innerHTML = "";
+        });
+
+        // Timestamp as HH:MM:SS.mmm
+        function timestamp() {
+          var d = new Date();
+          return (
+            String(d.getHours()).padStart(2, "0") + ":" +
+            String(d.getMinutes()).padStart(2, "0") + ":" +
+            String(d.getSeconds()).padStart(2, "0") + "." +
+            String(d.getMilliseconds()).padStart(3, "0")
+          );
+        }
+
+        // Map event type → CSS class name
+        var typeClass = {
+          "click":       "elog-click",
+          "hover:enter": "elog-hover-enter",
+          "hover:leave": "elog-hover-leave",
+          "focus":       "elog-focus",
+          "blur":        "elog-blur"
+        };
+
+        // Prepend one log entry (newest at top) and manage list size
+        function logEvent(evt) {
+          var meta = window.__topoMeta ? window.__topoMeta.get(evt.instance) : null;
+          var caseLabel  = meta ? meta.caseId  : "?";
+          var routeNames = meta ? meta.routeNames : [];
+
+          // Human-readable detail: point or path info
+          var detail = "";
+          if (evt.pointId !== null) {
+            detail = "point #" + evt.pointId + " (" + (evt.pointType || "?") + ")";
+            if (evt.routeIndices && evt.routeIndices.length) {
+              var names = evt.routeIndices.map(function (i) {
+                return routeNames[i] || ("route " + i);
+              });
+              detail += " \u2022 " + names.join(", ");
+            }
+          } else if (evt.routeIndex !== null) {
+            detail = "path \u2022 " + (routeNames[evt.routeIndex] || "route " + evt.routeIndex);
+          } else {
+            detail = "svg background";
+          }
+
+          var li = document.createElement("li");
+          var cls = typeClass[evt.type] || "elog-hover-leave";
+          li.innerHTML =
+            "<span class='elog-time'>" + timestamp() + "</span>" +
+            "<span class='elog-type " + cls + "'>" + evt.type + "</span>" +
+            "<span class='elog-case'>[" + caseLabel + "]</span>" +
+            "<span class='elog-detail'>" + detail + "</span>";
+          // Prepend so the newest entry always appears at the top
+          logList.insertBefore(li, logList.firstChild);
+
+          // Trim oldest entries (now at the bottom) beyond the cap
+          while (logList.children.length > MAX_ENTRIES) {
+            logList.removeChild(logList.lastChild);
+          }
+        }
+
+        // Bind all 5 event types globally (fires for any mounted TopoEditor instance)
+        ["click", "hover:enter", "hover:leave", "focus", "blur"].forEach(function (type) {
+          TopoEditor.on(type, logEvent);
+        });
+      })();
     </script>
   </body>
 </html>`;
