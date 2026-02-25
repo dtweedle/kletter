@@ -471,7 +471,9 @@ function serializeVariantSetup(
     // Renderer + editor setup.
     const rendererOpts: Record<string, unknown> = { width, height, curveIntensity: 1 };
     if (segmentStyle) rendererOpts.segmentStyle = segmentStyle;
-    if (pointStyle) rendererOpts.pointStyle = pointStyle;
+    // Always include a base opacity; merge any variant-level pointStyle on top so per-case
+    // overrides (radius, fillColor, etc.) are preserved while opacity is always set.
+    rendererOpts.pointStyle = { opacity: 0.9, ...(pointStyle ?? {}) };
     const editorOpts = JSON.stringify({ width, height, curveIntensity: 1 });
 
     js += `    var renderer = new TopoRender(${JSON.stringify(rendererOpts)});\n`;

@@ -343,6 +343,7 @@ for (const tc of testCases) {
                 height: 200,
                 curveIntensity: intensity,
                 segmentStyle: variant.segmentStyle,
+                pointStyle: { opacity: 0.9 },
             });
             intensityMap.set(intensity, topo.render(variant.routes, imageHref));
         }
